@@ -10,9 +10,12 @@ import time
 import gdal
 import datetime
 import logging
+from tqdm import tqdm
 from datetime import timedelta
 from pathlib import Path
 import zipfile
+
+from ost.s1.burst_to_ard import burst_to_ard
 
 logger = logging.getLogger(__name__)
 
@@ -128,24 +131,36 @@ def remove_folder_content(folder):
             shutil.rmtree(os.path.join(root, d))
 
 
-def run_command(command, logfile, elapsed=True):
+def run_command(command, logfile, elapsed=True, silent=False):
     '''A helper function to execute a command line command
 
     Args:
         command (str): the command to execute
         logfile (str): path to the logfile in case of errors
+        silent (bool): if you want to shut GPT up or not
 
     '''
 
     currtime = time.time()
+    if silent:
+        dev_null = open(os.devnull, 'w')
+        stderr = subprocess.STDOUT
+    else:
+        stderr = subprocess.PIPE
+        dev_null = None
 
     if os.name == 'nt':
-        process = subprocess.run(command, stderr=subprocess.PIPE)
+        process = subprocess.run(command,
+                                 stdout=dev_null,
+                                 stderr=stderr
+                                 )
     else:
-        process = subprocess.run(shlex.split(command), stderr=subprocess.PIPE)
+        process = subprocess.run(shlex.split(command),
+                                 stderr=stderr,
+                                 stdout=dev_null,
+                                 )
 
     return_code = process.returncode
-
     if return_code != 0:
         with open(str(logfile), 'w') as file:
             for line in process.stderr.decode().splitlines():
@@ -278,20 +293,19 @@ def check_out_tiff(file, test_stats=True):
 
 
 def check_zipfile(filename):
-        
     try:
         zip_archive = zipfile.ZipFile(filename)
     except zipfile.BadZipFile as er:
         logger.debug('Error: {}'.format(er))
         return 1
-    
     try:
         zip_test = zip_archive.testzip()
+        return_code = None
     except:
         logger.debug('Error')
         return 1
     else:
-        return zip_test
+        return return_code
 
 
 def resolution_in_degree(latitude, meters):
@@ -318,3 +332,94 @@ def zip_s1_safe_dir(dir_path, zip_path, product_id):
             if '.downloaded' not in zip_path:
                 zipf.write(file_path, product_id+'.SAFE'+file_path[len_dir:])
     zipf.close()
+
+
+def _slc_zip_to_processing_dir(
+        processing_dir,
+        product,
+        product_path
+):
+    import shutil
+    download_path = os.path.join(processing_dir, 'SAR',
+                                 product.product_type,
+                                 product.year,
+                                 product.month,
+                                 product.day
+                                 )
+    os.makedirs(download_path, exist_ok=True)
+
+    if not os.path.exists(
+            os.path.join(download_path, os.path.basename(product_path))
+    ):
+        shutil.copy(product_path, download_path)
+        with open(
+                os.path.join(
+                    download_path, os.path.basename(product_path)
+                )+'.downloaded', 'w'
+        ) as zip_dl:
+            zip_dl.write('1')
+
+
+def execute_ard(
+        burst,
+        swath,
+        master_file,
+        out_dir,
+        out_prefix,
+        temp_dir,
+        ard_parameters
+):
+    m_nr, m_burst_id, b_bbox = burst
+    out_file = opj(out_dir, '_'.join([
+        out_prefix, str(m_burst_id), 'BS.dim'
+    ])
+                   ).replace(' ', '_')
+    if os.path.isfile(out_file):
+        logger.debug('File for burst %s exists', m_burst_id)
+        return_code = 0
+        return return_code, out_file
+
+    return_code = burst_to_ard(
+        master_file=master_file,
+        swath=swath,
+        master_burst_nr=m_nr,
+        master_burst_id=str(m_burst_id),
+        master_burst_poly=b_bbox,
+        out_dir=out_dir,
+        out_prefix=out_prefix,
+        temp_dir=temp_dir,
+        polarimetry=False,
+        pol_speckle_filter=False,
+        resolution=ard_parameters['resolution'],
+        product_type=ard_parameters['product_type'],
+        speckle_filter=ard_parameters['speckle_filter'],
+        # To_db not working
+        to_db=ard_parameters['to_db'],
+        ls_mask_create=False,
+        dem=ard_parameters['dem'],
+    )
+    if return_code != 0:
+        raise RuntimeError(
+            'Something went wrong with the GPT processing! with return code: %s' %
+            return_code
+        )
+    if not os.path.isfile(out_file):
+        raise RuntimeError
+    return return_code, out_file
+
+
+class TqdmUpTo(tqdm):
+    """Provides `update_to(n)` which uses `tqdm.update(delta_n)`."""
+    def update_to(self, b=1, bsize=1, tsize=None):
+        """
+        b  : int, optional
+            Number of blocks transferred so far [default: 1].
+        bsize  : int, optional
+            Size of each block (in tqdm units) [default: 1].
+        tsize  : int, optional
+            Total size (in tqdm units). If [default: None] remains unchanged.
+        """
+        if tsize is not None:
+            self.total = tsize
+        # will also set self.n = b * bsize
+        self.update(b * bsize - self.n)

@@ -1,3 +1,6 @@
+import os
+import ost
+import inspect
 import logging
 import environs
 import datetime
@@ -8,6 +11,8 @@ logger = logging.getLogger(__name__)
 # read environment variables
 ENV = environs.Env()
 ENV.read_env()
+
+OST_ROOT = os.path.dirname(inspect.getfile(ost))
 
 # mapping of ENV types
 ENVTYPES = {
@@ -149,11 +154,25 @@ def get_param(param_name=None, process_config=None, default_config=None, prefix=
     try:
         value = default_config[param_name].parse(value)
     except Exception as e:
-        raise OSTConfigError("error on parameter '%s': %s"% (param_name, e))
+        raise OSTConfigError("error on parameter '%s': %s" % (param_name, e))
 
     logger.debug("use %s value: %s=%s", src, param_name, value)
     return value
 
+
+HERBERT_USER = {'uname': 'herbert_thethird',
+                'pword': 'q12w34er56ty7',
+                'asf_pword': 'q12w34er56ty7WER32P'
+                }
+
+GTIFF_OST_PROFILE = {
+    "driver": "GTiff",
+    "blockysize": 256,
+    "blockxsize": 256,
+    "tiled": True,
+    "compress": "deflate",
+    "interleave": "band"
+}
 
 SNAP_S1_RESAMPLING_METHODS = [
     'NEAREST_NEIGHBOUR',

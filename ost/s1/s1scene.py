@@ -1,10 +1,11 @@
 import os
+from datetime import datetime
 from os.path import join as opj
 import sys
 import json
 import glob
-import urllib
 import logging
+from urllib import parse
 from urllib.error import URLError
 import zipfile
 import fnmatch
@@ -17,9 +18,16 @@ import geopandas as gpd
 import requests
 from shapely.wkt import loads
 
+from godale import Executor
+
 from ost.settings import SNAP_S1_RESAMPLING_METHODS
 from ost.helpers import scihub, raster as ras
-from ost.s1.grd_to_ard import grd_to_ard, ard_to_rgb, ard_to_thumbnail
+from ost.helpers.helpers import execute_ard
+from ost.s1.grd_to_ard import grd_to_ard
+from ost.s1.convert_format import ard_to_rgb, ard_to_thumbnail, ard_slc_to_rgb, \
+    ard_slc_to_thumbnail
+from ost.helpers.bursts import get_bursts_by_polygon
+
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +65,10 @@ class Sentinel1Scene:
 
         self.rel_orbit = (((int(self.abs_orbit)
                             - int(self.orbit_offset)) % 175) + 1)
+
+        self.timestamp = datetime.strptime(
+            self.start_date+'T'+self.start_time, '%Y%m%dT%H%M%S'
+        )
 
         # get acquisition mode
         if self.mode_beam == 'IW':
@@ -117,7 +129,6 @@ class Sentinel1Scene:
         return inf_dict
 
     def download(self, download_dir, mirror=None):
-        
         # if not mirror:
         #    logger.debug('INFO: One or more of your scenes need to be downloaded.')
         #    logger.debug('Select the server from where you want to download:')
@@ -127,11 +138,8 @@ class Sentinel1Scene:
         #    mirror = input(' Type 1, 2 or 3: ')
 
         from ost.s1 import s1_dl
-        # if mirror == 1:
-        #     df = pd.DataFrame({'identifier': [self.scene_id]
-        #                    {'uuid'}: self.scihub_uuid(opener)})
         df = pd.DataFrame({'identifier': [self.scene_id]})
-        s1_dl.download_sentinel1(df, download_dir)
+        s1_dl.download_sentinel1(df, download_dir, mirror=mirror)
 
     # location of file (including diases)
     def _download_path(self, download_dir, mkdir=False):
@@ -161,7 +169,6 @@ class Sentinel1Scene:
         return path
 
     def _aws_path(self, data_mount):
-
         # print('Dummy function for aws path to be added')
         return '/foo/foo/foo'
     
@@ -205,26 +212,25 @@ class Sentinel1Scene:
 
     # scihub related
     def scihub_uuid(self, opener):
-
         # construct the basic the url
         base_url = ('https://scihub.copernicus.eu/apihub/odata/v1/'
                     'Products?$filter='
                     )
-        action = urllib.request.quote('Name eq \'{}\''.format(self.scene_id))
+        action = parse.quote('Name eq \'{}\''.format(self.scene_id))
         # construct the download url
         url = base_url + action
-
         try:
             # get the request
+            # requests.get(url, stream=False, auth=(uname, pword))
             req = opener.open(url)
         except URLError as error:
             if hasattr(error, 'reason'):
-                logger.debug('We failed to connect to the server.')
-                logger.debug('Reason: ', error.reason)
+                logger.error('We failed to connect to the server.')
+                logger.error('Reason: ', error.reason)
                 sys.exit()
             elif hasattr(error, 'code'):
-                logger.debug('The server couldn\'t fulfill the request.')
-                logger.debug('Error code: ', error.code)
+                logger.error('The server couldn\'t fulfill the request.')
+                logger.error('Error code: ', error.code)
                 sys.exit()
         else:
             # write the request to to the response variable
@@ -332,7 +338,6 @@ class Sentinel1Scene:
         anno_path = ('(\'{}\')/Nodes(\'{}.SAFE\')/Nodes(\'annotation\')/'
                      'Nodes'.format(uuid, self.scene_id))
         url = scihub_url + anno_path
-        # print(url)
         try:
             # get the request
             req = opener.open(url)
@@ -372,14 +377,11 @@ class Sentinel1Scene:
         Much of the code is taken from RapidSAR
         package (once upon a time on github).
         '''
-
         column_names = ['SceneID', 'Track', 'Date', 'SwathID', 'AnxTime',
                         'BurstNr', 'geometry']
         gdf = gpd.GeoDataFrame(columns=column_names)
-
         track = self.rel_orbit
         acq_date = self.start_date
-
         # pol = root.find('adsHeader').find('polarisation').text
         swath = et_root.find('adsHeader').find('swath').text
         lines_per_burst = np.int(et_root.find('swathTiming').find(
@@ -401,7 +403,6 @@ class Sentinel1Scene:
                 last[geo_point.find('line').text] = np.float32(
                     [geo_point.find('latitude').text,
                      geo_point.find('longitude').text])
-
         for i, b in enumerate(burstlist):
             firstline = str(i*lines_per_burst)
             lastline = str((i+1)*lines_per_burst)
@@ -457,7 +458,6 @@ class Sentinel1Scene:
                         'Date': acq_date, 'SwathID': swath,
                         'AnxTime': azi_anx_time, 'BurstNr': i+1,
                         'geometry': loads(wkt)}
-
             gdf = gdf.append(geo_dict, ignore_index=True)
 
         return gdf
@@ -508,7 +508,6 @@ class Sentinel1Scene:
 
         column_names = ['SceneID', 'Track', 'Date', 'SwathID', 'AnxTime',
                         'BurstNr', 'geometry']
-
         # crs for empty dataframe
         crs = {'init': 'epsg:4326'}
         gdf_final = gpd.GeoDataFrame(columns=column_names, crs=crs)
@@ -523,7 +522,6 @@ class Sentinel1Scene:
         # loop through xml annotation files
         for xml_file in xml_files:
             xml_string = archive.open(xml_file)
-
             gdf = self._burst_database(ET.parse(xml_string))
             gdf_final = gdf_final.append(gdf)
 
@@ -548,21 +546,20 @@ class Sentinel1Scene:
 
     # other data providers
     def asf_url(self):
-
         asf_url = 'https://datapool.asf.alaska.edu'
-
         if self.mission_id == 'S1A':
             mission = 'SA'
         elif self.mission_id == 'S1B':
             mission = 'SB'
-
         if self.product_type == 'SLC':
             product_type = self.product_type
         elif self.product_type == 'GRD':
             product_type = 'GRD_{}{}'.format(self.resolution_class, self.pol_mode[0])
 
-        return '{}/{}/{}/{}.zip'.format(asf_url, product_type,
-                                        mission, self.scene_id
+        return '{}/{}/{}/{}.zip'.format(asf_url,
+                                        product_type,
+                                        mission,
+                                        self.scene_id
                                         )
 
     def peps_uuid(self, uname, pword):
@@ -671,17 +668,23 @@ class Sentinel1Scene:
             self.ard_parameters['resampling'] = SNAP_S1_RESAMPLING_METHODS[2]
 
     def create_ard(self, infile, out_dir, out_prefix, temp_dir,
-                   subset=None, polar='VV,VH,HH,HV'):
-
-        self.center_lat = self._get_center_lat(infile)
+                   subset=None, polar='VV,VH,HH,HV', max_workers=int(os.cpu_count()/2)):
+        out_paths = []
+        if subset is not None:
+            p_poly = loads(subset)
+            self.processing_poly = p_poly
+            self.center_lat = p_poly.bounds[3]-p_poly.bounds[1]
+        else:
+            self.processing_poly = None
+            try:
+                self.center_lat = self._get_center_lat(infile)
+            except Exception as e:
+                raise
         if float(self.center_lat) > 59 or float(self.center_lat) < -59:
             logger.debug('INFO: Scene is outside SRTM coverage. Will use 30m ASTER'
                          ' DEM instead.'
                          )
             self.ard_parameters['dem'] = 'ASTER 1sec GDEM'
-        # self.ard_parameters['resolution'] = h.resolution_in_degree(
-        #    self.center_lat, self.ard_parameters['resolution'])
-
         if self.product_type == 'GRD':
             if not self.ard_parameters:
                 logger.debug('INFO: No ARD definition given.'
@@ -698,8 +701,9 @@ class Sentinel1Scene:
 
             # we need to convert the infile t a list for the grd_to_ard routine
             infile = [infile]
+            out_prefix = out_prefix.replace(' ', '_')
             # run the processing
-            out_file = grd_to_ard(
+            return_code = grd_to_ard(
                 infile,
                 out_dir,
                 out_prefix,
@@ -715,42 +719,138 @@ class Sentinel1Scene:
                 subset=subset,
                 polarisation=polar
             )
+            if return_code != 0:
+                raise RuntimeError(
+                    'Something went wrong with the GPT processing! '
+                    'with return code: %s' % return_code
+                )
             # write to class attribute
             self.ard_dimap = glob.glob(opj(out_dir, '{}*TC.dim'
                                            .format(out_prefix)))[0]
+            if not os.path.isfile(self.ard_dimap):
+                raise RuntimeError
+            out_paths.append(self.ard_dimap)
 
-        elif self.product_type != 'GRD':
-            logger.debug('ERROR: create_ard method for single products is currently'
-                         ' only available for GRD products'
-                         )
-        if os.path.isfile(out_file):
-            return out_file
+        elif self.product_type == 'SLC':
+            # TODO align ARD types with GRD
+            """
+            Works for only one product at a time, all products are handled as 
+            master products in this condition, returning an ARD with 
+            the provided ARD parameters!
+            """
+            if not self.ard_parameters:
+                logger.debug('INFO: No ARD definition given.'
+                             ' Using the OST standard ARD defintion'
+                             ' Use object.set_ard_defintion() first if you want to'
+                             ' change the ARD defintion.'
+                             )
+                self.set_ard_parameters('GTCgamma')
+                self.ard_parameters['type'] = 'GTCgamma'
+            if self.ard_parameters['resampling'] not in SNAP_S1_RESAMPLING_METHODS:
+                self.ard_parameters['resampling'] = 'BILINEAR_INTERPOLATION'
+                logger.debug('WARNING: Invalid resampling method '
+                             'using BILINEAR_INTERPOLATION'
+                             )
+            # we need to convert the infile t a list for the grd_to_ard routine
+            if subset is not None:
+                try:
+                    processing_poly = loads(subset)
+                    self.processing_poly = processing_poly
+                except Exception as e:
+                    raise e
+            else:
+                processing_poly = None
+            # get file paths
+            master_file = self.get_path(out_dir)
+            # get bursts
+            master_bursts = self._zip_annotation_get(download_dir=out_dir)
+            bursts_dict = get_bursts_by_polygon(
+                master_annotation=master_bursts,
+                out_poly=processing_poly
+            )
+            exception_flag = True
+            exception_counter = 0
+            while exception_flag is True:
+                executor_type = 'concurrent_processes'
+                executor = Executor(executor=executor_type, max_workers=max_workers)
+                if exception_counter > 3 or exception_flag is False:
+                    break
+                for swath, b in bursts_dict.items():
+                    if b != []:
+                        try:
+                            for task in executor.as_completed(
+                                    func=execute_ard,
+                                    iterable=b,
+                                    fargs=(swath,
+                                           master_file,
+                                           out_dir,
+                                           out_prefix,
+                                           temp_dir,
+                                           self.ard_parameters
+                                           )
+
+                            ):
+                                return_code, out_file = task.result()
+                                out_paths.append(out_file)
+                        except Exception as e:
+                            logger.debug(e)
+                            max_workers = int(max_workers/2)
+                            exception_flag = True
+                            exception_counter += 1
+                        else:
+                            exception_flag = False
+                    else:
+                        exception_flag = False
+                        continue
+            self.ard_dimap = out_paths
         else:
-            raise RuntimeError
+            raise RuntimeError('ERROR: create_ard needs S1 SLC or GRD')
+        return out_paths
 
-    def create_rgb(self, outfile, driver='GTiff'):
+    def create_rgb(self, outfile, process_bounds=None, driver='GTiff'):
         # invert ot db from create_ard workflow for rgb creation
         # (otherwise we do it double)
+        logger.debug('Creating RGB Geotiff for scene: %s', self.scene_id)
         if self.ard_parameters['to_db']:
             to_db = False
         else:
             to_db = True
-
-        ard_to_rgb(self.ard_dimap, outfile, driver, to_db)
+        if self.product_type == 'GRD':
+            self.processing_poly = None
+            ard_to_rgb(self.ard_dimap, outfile, driver, to_db)
+        elif self.product_type == 'SLC':
+            if process_bounds is None:
+                process_bounds = self.processing_poly.bounds
+            ard_slc_to_rgb(self.ard_dimap, outfile, process_bounds, driver)
         self.ard_rgb = outfile
+        logger.debug('RGB Geotiff done for scene: %s', self.scene_id)
         return outfile
 
     def create_rgb_thumbnail(self, outfile, driver='JPEG', shrink_factor=25):
-        # invert ot db from create_ard workflow for rgb creation
+        # invert to db from create_ard workflow for rgb creation
         # (otherwise we do it double)
-        if self.ard_parameters['to_db']:
+        if self.product_type == 'GRD':
+            if self.ard_parameters['to_db']:
+                to_db = False
+            else:
+                to_db = True
+            self.rgb_thumbnail = outfile
+            ard_to_thumbnail(
+                self.ard_dimap,
+                self.rgb_thumbnail,
+                driver,
+                shrink_factor,
+                to_db
+            )
+        elif self.product_type == 'SLC':
             to_db = False
-        else:
-            to_db = True
-
-        self.rgb_thumbnail = outfile
-        ard_to_thumbnail(self.ard_dimap, self.rgb_thumbnail,
-                         driver, shrink_factor, to_db)
+            self.rgb_thumbnail = outfile
+            ard_slc_to_thumbnail(
+                self.ard_rgb,
+                self.rgb_thumbnail,
+                driver,
+                shrink_factor
+            )
         return outfile
 
     def visualise_rgb(self, shrink_factor=25):
@@ -758,7 +858,7 @@ class Sentinel1Scene:
 
     # other functions
     def _get_center_lat(self, scene_path=None):
-        if scene_path[-4:] == '.zip':
+        if scene_path.endswith('.zip'):
             zip_archive = zipfile.ZipFile(scene_path)
             manifest = zip_archive.read('{}.SAFE/manifest.safe'
                                         .format(self.scene_id)

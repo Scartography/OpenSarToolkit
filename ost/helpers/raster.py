@@ -261,7 +261,6 @@ def convert_to_power(db_array):
 
 # convert power to dB
 def convert_to_db(pow_array):
-
     pow_array[pow_array < 0] = 0.0000001
     db_array = 10 * np.log10(pow_array.clip(min=0.0000000000001))
     return db_array
@@ -269,22 +268,20 @@ def convert_to_db(pow_array):
 
 # rescale sar dB dat ot integer format
 def scale_to_int(float_array, min_value, max_value, datatype):
-
     # set output min and max
     display_min = 1.
     if datatype == 'uint8':
         display_max = 255.
     elif datatype == 'uint16':
         display_max = 65535.
-
+    else:
+        raise AttributeError('Missing output datatype!')
     a = min_value - ((max_value - min_value)/(display_max - display_min))
     x = (max_value - min_value)/(display_max - 1)
 
     float_array[float_array > max_value] = max_value
     float_array[float_array < min_value] = min_value
-
     int_array = np.round((float_array - a) / x).astype(datatype)
-
     return int_array
 
 
@@ -299,7 +296,6 @@ def rescale_to_float(int_array, data_type_name):
                        * (35. / 65535.) + (-30. - (35. / 65535.)))
     else:
         logger.debug('ERROR: Unknown datatype')
-
     return float_array
 
 
@@ -367,13 +363,10 @@ def outlier_removal(arrayin, stddev=3):
             arrayin < masked_mean - masked_std * stddev,
             )
         )
-
     return array_out
 
 
 def norm(band, percentile=False):
-    
-    
     if percentile:
         band_min, band_max = np.percentile(band, 2), np.percentile(band, 98)
     else:
@@ -414,18 +407,22 @@ def get_min(file):
 
 
 def get_max(file):
-
     maxs = {'BS.VV': 0, 'BS.VH': -12, 'BS.HH': 0, 'BS.HV': -5,
             'coh.VV': 0.8, 'coh.VH': 0.75,
             'Alpha': 80, 'Entropy': 0.8, 'Anisotropy': 0.8}
-
     for key, items in maxs.items():
         if key in file:
             return items
 
 
-def create_rgb_jpeg(filelist, outfile=None, shrink_factor=1, plot=False,
-                   minimum_list=None, maximum_list=None, date=None):
+def create_rgb_jpeg(filelist,
+                    outfile=None,
+                    shrink_factor=1,
+                    plot=False,
+                    minimum_list=None,
+                    maximum_list=None,
+                    date=None
+                    ):
 
     import matplotlib.pyplot as plt
 
@@ -433,15 +430,13 @@ def create_rgb_jpeg(filelist, outfile=None, shrink_factor=1, plot=False,
     maximum_list = []
 
     with rasterio.open(filelist[0]) as src:
-        
         # get metadata
         out_meta = src.meta.copy()
-
         # !!!assure that dimensions match ####
         new_height = int(src.height/shrink_factor)
         new_width = int(src.width/shrink_factor)
         out_meta.update(height=new_height, width=new_width)
-        count=1
+        count = 1
         
         layer1 = src.read(
                 out_shape=(src.count, new_height, new_width),
@@ -460,7 +455,7 @@ def create_rgb_jpeg(filelist, outfile=None, shrink_factor=1, plot=False,
             minimum_list.append(get_min(filelist[1]))
             maximum_list.append(get_max(filelist[1]))
             layer2[layer2 == 0] = np.nan
-            count=3
+            count = 3
             
     if len(filelist) == 2:    # that should be the BS ratio case
         layer3 = np.subtract(layer1, layer2)
@@ -515,22 +510,24 @@ def create_rgb_jpeg(filelist, outfile=None, shrink_factor=1, plot=False,
         plt.imshow(arr)
 
     
-def create_timeseries_animation(timeseries_folder, product_list, out_folder,
-                                shrink_factor=1, duration=1, add_dates=False):
+def create_timeseries_animation(timeseries_folder,
+                                product_list,
+                                out_folder,
+                                shrink_factor=1,
+                                duration=1,
+                                add_dates=False
+                                ):
 
-    
     nr_of_products = len(glob.glob(
         opj(timeseries_folder, '*{}.tif'.format(product_list[0]))))
     outfiles = []
     # for coherence it must be one less
-    if 'coh.VV'in product_list or 'coh.VH'in product_list:
+    if 'coh.VV' in product_list or 'coh.VH' in product_list:
         nr_of_products == nr_of_products - 1
         
     for i in range(nr_of_products):
-
         filelist = [glob.glob(opj(timeseries_folder, '{}.*{}*tif'.format(i + 1, product)))[0] for product in product_list]
-        dates = os.path.basename(filelist[0]).split('.')[1]    
-        
+        dates = os.path.basename(filelist[0]).split('.')[1]
         if add_dates:
             date = dates
         else:
@@ -539,17 +536,61 @@ def create_timeseries_animation(timeseries_folder, product_list, out_folder,
         create_rgb_jpeg(filelist, 
                         opj(out_folder, '{}.{}.jpeg'.format(i+1, dates)),
                         shrink_factor, 
-                        date=date)
-
+                        date=date
+                        )
         outfiles.append(opj(out_folder, '{}.{}.jpeg'.format(i+1, dates)))
-
     # create gif
-    with imageio.get_writer(opj(out_folder, 'ts_animation.gif'), mode='I',
-        duration=duration) as writer:
-
+    with imageio.get_writer(
+            opj(out_folder, 'ts_animation.gif'),
+            mode='I',
+            duration=duration
+    ) as writer:
         for file in outfiles:
             image = imageio.imread(file)
             writer.append_data(image)
             os.remove(file)
             if os.path.isfile(file + '.aux.xml'):
                 os.remove(file + '.aux.xml')
+
+
+def np_binary_erosion(input_array, structure=np.ones((3, 3)).astype(np.bool)):
+    '''NumPy binary erosion function
+
+    No error checking on input array (type)
+    No error checking on structure element (# of dimensions, shape, type, etc.)
+
+    Args:
+    input_array: Binary NumPy array to be eroded. Non-zero (True) elements
+        form the subset to be eroded
+    structure: Structuring element used for the erosion. Non-zero elements
+        are considered True. If no structuring element is provided, an
+        element is generated with a square connectivity equal to two
+        (square, not cross).
+    Returns:
+        binary_erosion: Erosion of the input by the stucturing element
+    '''
+    bands, rows, cols = input_array.shape
+    input_shape = (rows, cols)
+
+    # Pad output array (binary_erosion) with extra cells around the edge
+    # so that structuring element will fit without wrapping.
+    # A 3x3 structure, will need 1 additional cell around the edge
+    # A 5x5 structure, will need 2 additional cells around the edge
+    pad_shape = (
+        input_shape[0] + structure.shape[0] - 1,
+        input_shape[1] + structure.shape[1] - 1)
+    input_pad_array = np.zeros(pad_shape).astype(np.bool)
+    input_pad_array[1:rows+1, 1:cols+1] = input_array
+    binary_erosion = np.zeros(pad_shape).astype(np.bool)
+
+    # Cast structure element to boolean
+    struc_mask = structure.astype(np.bool)
+
+    # Iterate over each cell
+    for row in range(rows):
+        for col in range(cols):
+            # The value of the output pixel is the minimum value of all the
+            # pixels in the input pixel's neighborhood.
+            binary_erosion[row+1, col+1] = np.min(
+                input_pad_array[row:row+3, col:col+3][struc_mask])
+    return binary_erosion[1:rows+1, 1:cols+1]
