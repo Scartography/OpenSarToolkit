@@ -58,7 +58,7 @@ def s1_slc_ost_slave(s1_slc_slave):
 
 @pytest.fixture
 def s1_grd_notnr_ost_product(s1_grd_notnr):
-    scene_id = s1_grd_notnr.split('/')[-2]
+    scene_id = s1_grd_notnr.split('/')[-1]
     return (scene_id, Sentinel1Scene(scene_id))
 
 

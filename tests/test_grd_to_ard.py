@@ -27,14 +27,13 @@ def test_ost_grd_to_ard(
                                      )
         os.makedirs(download_path, exist_ok=True)
         _zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
-                        os.path.join(download_path, scene_id+'.zip.downloaded'),
-                        scene_id
-                        )
+                         os.path.join(download_path, scene_id+'.zip.downloaded'),
+                         scene_id
+                         )
         _zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
-                        os.path.join(download_path, scene_id+'.zip'),
-                        scene_id
-                        )
-
+                         os.path.join(download_path, scene_id+'.zip'),
+                         scene_id
+                         )
         product.set_ard_parameters(ard_type)
         try:
             out_files = product.create_ard(
