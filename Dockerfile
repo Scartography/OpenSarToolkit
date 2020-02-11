@@ -12,9 +12,6 @@ ENV TBX="esa-snap_sentinel_unix_${TBX_VERSION}_${TBX_SUBVERSION}.sh" \
   HOME=$HOME \
   PATH=$PATH:$HOME/programs/snap/bin:$HOME/programs/OTB-${OTB_VERSION}-Linux64/bin
 
-# gdal
-RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -yq libgdal-dev
-
 RUN sed -i -e 's:(groups):(groups 2>/dev/null):' /etc/bash.bashrc && \
     mkdir $HOME/programs
 
@@ -40,7 +37,7 @@ RUN conda install  --quiet --yes \
 RUN jupyter labextension install @jupyterlab/geojson-extension
 
 # copy the snap installation config file into the container
-COPY ./snap7.varfile $HOME/programs/
+COPY snap7.varfile $HOME/programs/
 
 # Download and install SNAP and ORFEO Toolbox
 RUN cd  $HOME/programs && \
