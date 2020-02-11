@@ -4,7 +4,7 @@ import rasterio
 from shapely.geometry import box
 from tempfile import TemporaryDirectory
 
-from ost.helpers.helpers import _slc_zip_to_processing_dir
+from ost.helpers.helpers import _product_zip_to_processing_dir
 
 
 def test_ost_slc_to_ard(
@@ -30,7 +30,7 @@ def test_ost_slc_to_ard(
                                      product.day
                                      )
         os.makedirs(download_path, exist_ok=True)
-        _slc_zip_to_processing_dir(
+        _product_zip_to_processing_dir(
             processing_dir=processing_dir,
             product=product,
             product_path=s1_slc_master
@@ -80,7 +80,7 @@ def test_ost_flat_slc_to_ard(
                                      product.day
                                      )
         os.makedirs(download_path, exist_ok=True)
-        _slc_zip_to_processing_dir(
+        _product_zip_to_processing_dir(
             processing_dir=processing_dir,
             product=product,
             product_path=s1_slc_master
@@ -130,7 +130,7 @@ def test_earth_engine_slc_to_ard(
                                      product.day
                                      )
         os.makedirs(download_path, exist_ok=True)
-        _slc_zip_to_processing_dir(
+        _product_zip_to_processing_dir(
             processing_dir=processing_dir,
             product=product,
             product_path=s1_slc_master
@@ -180,7 +180,7 @@ def test_ceos_slc_to_ard(
                                      product.day
                                      )
         os.makedirs(download_path, exist_ok=True)
-        _slc_zip_to_processing_dir(
+        _product_zip_to_processing_dir(
             processing_dir=processing_dir,
             product=product,
             product_path=s1_slc_master
@@ -230,7 +230,7 @@ def test_zhuo_slc_to_ard(
                                      product.day
                                      )
         os.makedirs(download_path, exist_ok=True)
-        _slc_zip_to_processing_dir(
+        _product_zip_to_processing_dir(
             processing_dir=processing_dir,
             product=product,
             product_path=s1_slc_master
