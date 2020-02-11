@@ -17,9 +17,13 @@ from ost.helpers import helpers as h, raster as ras, vector as vec
 logger = logging.getLogger(__name__)
 
 
-def create_stack(filelist, out_stack, logfile,
-                 polarisation=None, pattern=None
-                 ):
+def create_grd_stack(
+        filelist,
+        out_stack,
+        logfile,
+        polarisation='VV,VH',
+        pattern=None
+):
     '''
 
     :param filelist: list of single Files (space separated)
@@ -34,6 +38,8 @@ def create_stack(filelist, out_stack, logfile,
     rootpath = imp.find_module('ost')[1]
 
     logger.debug("INFO: Creating multi-temporal stack of images")
+    if isinstance(filelist, list):
+        filelist = ','.join(filelist)
     if pattern:
         graph = opj(rootpath, 'graphs', 'S1_TS', '1_BS_Stacking_HAalpha.xml')
         command = '{} {} -x -q {} -Pfilelist={} -PbandPattern=\'{}.*\'\
@@ -132,7 +138,6 @@ def mt_layover(filelist, outfile, temp_dir, extent):
                       datatype='uint8', rescale=False, ndv=0)
     # os.remove(ls_layer)
     h.timer(start)
-
     return outfile
 
 

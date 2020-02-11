@@ -11,8 +11,8 @@ COPY snap7.varfile $HOME
 
 # update variables
 ENV OTB_VERSION="7.0.0" \
-    TBX_VERSION="7" \
-    TBX_SUBVERSION="0"
+  TBX_VERSION="7" \
+  TBX_SUBVERSION="0"
 ENV TBX="esa-snap_sentinel_unix_${TBX_VERSION}_${TBX_SUBVERSION}.sh" \
   SNAP_URL="http://step.esa.int/downloads/${TBX_VERSION}.${TBX_SUBVERSION}/installers" \
   OTB=OTB-${OTB_VERSION}-Linux64.run \
@@ -42,7 +42,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*  && \
     python3 -m pip install jupyterlab
 
-# gdal
+# Install gdal libraries
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -yq libgdal-dev
 
 # Download and install SNAP and ORFEO Toolbox

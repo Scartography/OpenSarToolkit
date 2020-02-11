@@ -99,9 +99,15 @@ def _create_processing_dict(inventory_df):
     return dict_scenes
 
 
-def grd_to_ard_batch(inventory_df, download_dir, processing_dir,
-                     temp_dir, ard_parameters, subset=None, 
-                     data_mount='/eodata'):
+def grd_to_ard_batch(
+        inventory_df,
+        download_dir,
+        processing_dir,
+        temp_dir,
+        ard_parameters,
+        subset=None,
+        data_mount='/eodata'
+):
      
     # get params
     resolution = ard_parameters['resolution']
@@ -112,6 +118,7 @@ def grd_to_ard_batch(inventory_df, download_dir, processing_dir,
     dem = ard_parameters['dem']
     to_db = ard_parameters['to_db']
     border_noise = ard_parameters['border_noise']
+    resampling = ard_parameters['resampling']
 
     # we create a processing dictionary,
     # where all frames are grouped into acquisitions
@@ -132,9 +139,10 @@ def grd_to_ard_batch(inventory_df, download_dir, processing_dir,
                              )
             else:
                 # get the paths to the file
-                scene_paths = ([Sentinel1Scene(i).get_path(download_dir)
-                               for i in list_of_scenes])
-
+                scene_paths = ([
+                    Sentinel1Scene(i).get_path(download_dir)
+                    for i in list_of_scenes
+                ])
                 # apply the grd_to_ard function
                 grd_to_ard.grd_to_ard(
                     scene_paths,
@@ -149,11 +157,18 @@ def grd_to_ard_batch(inventory_df, download_dir, processing_dir,
                     to_db=to_db,
                     border_noise=border_noise,
                     subset=subset,
-                    polarisation=polarisation
+                    polarisation=polarisation,
+                    resampling=resampling
                 )
 
 
-def ards_to_timeseries(inventory_df, processing_dir, temp_dir, ard_parameters):
+def ards_to_timeseries(
+        inventory_df,
+        processing_dir,
+        temp_dir,
+        ard_parameters
+):
+    return_code = 666
     # get params
     to_db = ard_parameters['to_db']
     if to_db:
@@ -171,13 +186,14 @@ def ards_to_timeseries(inventory_df, processing_dir, temp_dir, ard_parameters):
     vrt_options = gdal.BuildVRTOptions(srcNodata=0, separate=True)
 
     for track, allScenes in processing_dict.items():
-  
         logger.debug('INFO: Entering track {}.'.format(track))
         track_dir = opj(processing_dir, track)
         all_outfiles = []
         
         if os.path.isfile(opj(track_dir, 'Timeseries', '.processed')):
-            logger.debug('INFO: Timeseries for track {} already processed.'.format(track))
+            logger.debug(
+                'INFO: Timeseries for track {} already processed.'.format(track)
+            )
         else:
             logger.debug('INFO: Processing Timeseries for track {}.'.format(track))
             # 1) get minimum valid extent
@@ -195,14 +211,22 @@ def ards_to_timeseries(inventory_df, processing_dir, temp_dir, ard_parameters):
             if ls_mask_create:
                 list_of_scenes = glob.glob(opj(track_dir, '20*', '*data*', '*img'))
                 list_of_layover = [x for x in list_of_scenes if 'layover'in x]
-                out_ls = opj(track_dir, '{}.ls_mask.tif'.format(track))
+                out_ls = opj(
+                    track_dir,
+                    '{}.ls_mask.tif'.format(track)
+                )
                 ts.mt_layover(list_of_layover, out_ls, temp_dir, extent=extent)
                 logger.debug('INFO: Our common layover mask is located at {}'.format(
                         out_ls))
     
-            if ls_mask_apply:
-                logger.debug('INFO: Calculating symetrical difference of extent and ls_mask')
-                ras.polygonize_raster(out_ls, '{}.shp'.format(out_ls[:-4]))
+            if ls_mask_apply and ls_mask_create:
+                logger.debug(
+                    'INFO: Calculating symetrical difference of extent and ls_mask'
+                )
+                ras.polygonize_raster(
+                    out_ls,
+                    '{}.shp'.format(out_ls[:-4])
+                )
                 extent_ls_masked = opj(track_dir, '{}.extent.masked.shp'.format(track))
                 vec.difference(extent, '{}.shp'.format(out_ls[:-4]), extent_ls_masked)
                 extent = extent_ls_masked
@@ -210,7 +234,9 @@ def ards_to_timeseries(inventory_df, processing_dir, temp_dir, ard_parameters):
             for p in ['VV', 'VH', 'HH', 'HV']:
     
                 # check if polarisation is existent
-                list_of_pols = sorted(glob.glob(opj(track_dir, '20*', '*TC*data', '*{}*.img'.format(p))))
+                list_of_pols = sorted(
+                    glob.glob(opj(track_dir, '20*', '*TC*data', '*{}*.img'.format(p)))
+                )
     
                 if len(list_of_pols) >= 2:
     
@@ -259,9 +285,17 @@ def ards_to_timeseries(inventory_df, processing_dir, temp_dir, ard_parameters):
                         indate = datetime.datetime.strptime(date, '%d%b%Y')
                         outdate = datetime.datetime.strftime(indate, '%y%m%d')
     
-                        infile = glob.glob(opj('{}.data'.format(out_stack), '*{}*{}*img'.format(p, date)))[0]
+                        infile = glob.glob(
+                            opj('{}.data'.format(out_stack),
+                                '*{}*{}*img'.format(p, date)
+                                )
+                        )[0]
                         # create outFile
-                        outfile = opj(track_dir, 'Timeseries', '{}.{}.BS.{}.tif'.format(i, outdate, p))
+                        outfile = opj(
+                            track_dir,
+                            'Timeseries',
+                            '{}.{}.BS.{}.tif'.format(i, outdate, p)
+                        )
                         # mask by extent
                         ras.mask_by_shape(
                             infile, outfile,
@@ -278,8 +312,14 @@ def ards_to_timeseries(inventory_df, processing_dir, temp_dir, ard_parameters):
                         i += 1
     
                     # build vrt of timeseries
-                    gdal.BuildVRT(opj(track_dir, 'Timeseries', 'BS.Timeseries.{}.vrt'.format(p)), outfiles, options=vrt_options)
-                    #if os.path.isdir('{}.data'.format(out_stack)):
+                    gdal.BuildVRT(opj(
+                        track_dir,
+                        'Timeseries',
+                        'BS.Timeseries.{}.vrt'.format(p)),
+                        outfiles,
+                        options=vrt_options
+                    )
+                    # if os.path.isdir('{}.data'.format(out_stack)):
                     h.delete_dimap(out_stack)
         
             for file in all_outfiles:
@@ -296,8 +336,13 @@ def ards_to_timeseries(inventory_df, processing_dir, temp_dir, ard_parameters):
                     file.write('passed all tests \n')
     
 
-def timeseries_to_timescan(inventory_df, processing_dir, ard_parameters):
+def timeseries_to_timescan(
+        inventory_df,
+        processing_dir,
+        ard_parameters
+):
 
+    return_code = 666
     metrics = ard_parameters['metrics']
     outlier_removal = ard_parameters['outlier_removal']
     
@@ -329,7 +374,11 @@ def timeseries_to_timescan(inventory_df, processing_dir, ard_parameters):
             for p in ['VV', 'VH', 'HH', 'HV']:
     
                 # Get timeseries vrt
-                timeseries = opj(track_dir, 'Timeseries', 'BS.Timeseries.{}.vrt'.format( p))
+                timeseries = opj(
+                    track_dir,
+                    'Timeseries',
+                    'BS.Timeseries.{}.vrt'.format(p)
+                )
     
                 # define timescan prefix
                 timescan_prefix = opj(timescan_dir, 'BS.{}'.format(p))
@@ -369,7 +418,6 @@ def timeseries_to_timescan(inventory_df, processing_dir, ard_parameters):
                 check_file = opj(track_dir, 'Timescan', '.processed')
                 with open(str(check_file), 'w') as file:
                     file.write('passed all tests \n')
-            
             # create vrt
             vrt_options = gdal.BuildVRTOptions(srcNodata=0, separate=True)
             gdal.BuildVRT(opj(track_dir, 'Timescan', 'Timescan.vrt'),
@@ -378,9 +426,7 @@ def timeseries_to_timescan(inventory_df, processing_dir, ard_parameters):
 
 
 def mosaic_timeseries(inventory_df, processing_dir, temp_dir):
-
     logger.debug('INFO: Mosaicking Time-series layers')
-    
     for p in ['VV', 'VH', 'HH', 'HV']:
         processing_dict = _create_processing_dict(inventory_df)
         keys = [x for x in processing_dict.keys()]
@@ -388,11 +434,10 @@ def mosaic_timeseries(inventory_df, processing_dir, temp_dir):
 
         os.makedirs(opj(processing_dir, 'Mosaic', 'Timeseries'), exist_ok=True)
         
-        nrOfTs = len(glob.glob(opj(
+        nr_of_ts = len(glob.glob(opj(
             processing_dir, keys[0], 'Timeseries', '*.{}.tif'.format(p))))
-        
-        if nrOfTs >= 1:
-            for i in range(nrOfTs):
+        if nr_of_ts >= 1:
+            for i in range(nr_of_ts):
                 j = i + 1
                 filelist = glob.glob(opj(
                     processing_dir, '*', 'Timeseries', 
@@ -473,17 +518,20 @@ def mosaic_timeseries(inventory_df, processing_dir, temp_dir):
                     # write file, so we know this ts has been succesfully processed
                     if return_code == 0:
                         with open(str(check_file), 'w') as file:
-                            file.write('passed all tests \n')  
-                     
-            # create vrt
+                            file.write('passed all tests \n')
+        # create vrt
         vrt_options = gdal.BuildVRTOptions(srcNodata=0, separate=True)
         gdal.BuildVRT(opj(processing_dir, 'Mosaic', 'Timeseries', 'Timeseries.{}.vrt'.format(p)),
                       outfiles,
                       options=vrt_options) 
         
 
-def mosaic_timescan(inventory_df, processing_dir, temp_dir, ard_parameters):
-    
+def mosaic_timescan(
+        inventory_df,
+        processing_dir,
+        temp_dir,
+        ard_parameters
+):
     logger.debug('INFO: Mosaicking Timescan layers')
     metrics = ard_parameters['metrics']
     outfiles = []
@@ -502,16 +550,38 @@ def mosaic_timescan(inventory_df, processing_dir, temp_dir, ard_parameters):
                 i = os.path.basename(filelist[0]).split('.')[0]
                 filelist = ''.join(filelist)
                 
-                outfile = opj(processing_dir, 'Mosaic', 'Timescan', '{}.BS.{}.{}.tif'.format(i, p, metric))
-                check_file = opj(processing_dir, 'Mosaic', 'Timescan', '.{}.BS.{}.{}.processed'.format(i, p, metric))
-                logfile = opj(processing_dir, 'Mosaic', 'Timescan', '{}.BS.{}.{}.errLog'.format(i, p, metric))
-                 
+                outfile = opj(
+                    processing_dir,
+                    'Mosaic',
+                    'Timescan',
+                    '{}.BS.{}.{}.tif'.format(i, p, metric)
+                )
+                check_file = opj(
+                    processing_dir,
+                    'Mosaic',
+                    'Timescan',
+                    '.{}.BS.{}.{}.processed'.format(i, p, metric)
+                )
+                logfile = opj(
+                    processing_dir,
+                    'Mosaic',
+                    'Timescan',
+                    '{}.BS.{}.{}.errLog'.format(i, p, metric)
+                )
                 outfiles.append(outfile)
                 
                 if os.path.isfile(check_file):
-                    logger.debug('INFO: Mosaic layer {} already processed.'.format(os.path.basename(outfile)))
+                    logger.debug(
+                        'INFO: Mosaic layer {} already processed.'.format(
+                            os.path.basename(outfile)
+                        )
+                    )
                 else:
-                    logger.debug('INFO: Mosaicking layer {}.'.format(os.path.basename(outfile)))
+                    logger.debug(
+                        'INFO: Mosaicking layer {}.'.format(
+                            os.path.basename(outfile)
+                        )
+                    )
                     cmd = ('otbcli_Mosaic -ram 4096 -progress 1 \
                                 -comp.feather large -harmo.method band \
                                 -harmo.cost rmse -temp_dir {} -il {} \
@@ -530,10 +600,10 @@ def mosaic_timescan(inventory_df, processing_dir, temp_dir, ard_parameters):
                     # write file, so we know this ts has been succesfully processed
                     if return_code == 0:
                         with open(str(check_file), 'w') as file:
-                            file.write('passed all tests \n')  
-                            
+                            file.write('passed all tests \n')
     # create vrt
     vrt_options = gdal.BuildVRTOptions(srcNodata=0, separate=True)
     gdal.BuildVRT(opj(processing_dir, 'Mosaic', 'Timescan', 'Timescan.vrt'),
                   outfiles,
-                  options=vrt_options)       
+                  options=vrt_options
+                  )

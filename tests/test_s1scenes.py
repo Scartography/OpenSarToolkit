@@ -56,6 +56,17 @@ def test_s1_scenes(s1_slc_master,
             assert dif == control_dif
 
 
+def test_create_stack(s1_grd_notnr):
+    filelist = [s1_grd_notnr, s1_grd_notnr]
+    with TemporaryDirectory(dir=os.getcwd()) as temp:
+        s1_scenes = S1Scenes(filelist,
+                             processing_dir=temp,
+                             ard_type=None,
+                             cleanup=False
+                             )
+        out_stack = s1_scenes.create_grd_stack()
+
+
 def test_coherence_s1_scenes(s1_slc_master, s1_slc_slave, some_bounds_slc):
     filelist = [s1_slc_master, s1_slc_slave]
 

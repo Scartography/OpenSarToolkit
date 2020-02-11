@@ -24,8 +24,7 @@ def ard_types():
 def s1_grd_notnr():
     return os.path.join(
         CACHE_DIR,
-        'S1B_IW_GRDH_1SDV_20180813T054020_20180813T054045_012240_0168D6_B775',
-        'manifest.safe'
+        'S1B_IW_GRDH_1SDV_20180813T054020_20180813T054045_012240_0168D6_B775'
     )
 
 

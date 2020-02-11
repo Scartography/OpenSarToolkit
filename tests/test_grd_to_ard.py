@@ -4,7 +4,7 @@ import rasterio
 from shapely.geometry import box
 from tempfile import TemporaryDirectory
 
-from ost.helpers.helpers import zip_s1_safe_dir
+from ost.helpers.helpers import _zip_s1_safe_dir
 
 
 def test_ost_grd_to_ard(
@@ -26,11 +26,11 @@ def test_ost_grd_to_ard(
                                      product.day
                                      )
         os.makedirs(download_path, exist_ok=True)
-        zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
+        _zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
                         os.path.join(download_path, scene_id+'.zip.downloaded'),
                         scene_id
                         )
-        zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
+        _zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
                         os.path.join(download_path, scene_id+'.zip'),
                         scene_id
                         )
@@ -77,11 +77,11 @@ def test_ost_flat_grd_to_ard(
                                      product.day
                                      )
         os.makedirs(download_path, exist_ok=True)
-        zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
+        _zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
                         os.path.join(download_path, scene_id+'.zip.downloaded'),
                         scene_id
                         )
-        zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
+        _zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
                         os.path.join(download_path, scene_id+'.zip'),
                         scene_id
                         )
@@ -128,11 +128,11 @@ def test_ceos_grd_to_ard(
                                      product.day
                                      )
         os.makedirs(download_path, exist_ok=True)
-        zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
+        _zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
                         os.path.join(download_path, scene_id+'.zip.downloaded'),
                         scene_id
                         )
-        zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
+        _zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
                         os.path.join(download_path, scene_id+'.zip'),
                         scene_id
                         )
@@ -179,11 +179,11 @@ def test_earth_engine_grd_to_ard(
                                      product.day
                                      )
         os.makedirs(download_path, exist_ok=True)
-        zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
+        _zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
                         os.path.join(download_path, scene_id+'.zip.downloaded'),
                         scene_id
                         )
-        zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
+        _zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
                         os.path.join(download_path, scene_id+'.zip'),
                         scene_id
                         )
@@ -230,11 +230,11 @@ def test_zhuo_grd_to_ard(
                                      product.day
                                      )
         os.makedirs(download_path, exist_ok=True)
-        zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
+        _zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
                         os.path.join(download_path, scene_id+'.zip.downloaded'),
                         scene_id
                         )
-        zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
+        _zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
                         os.path.join(download_path, scene_id+'.zip'),
                         scene_id
                         )

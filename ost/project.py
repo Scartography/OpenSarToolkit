@@ -1,4 +1,5 @@
 import os
+import shutil
 import sys
 import glob
 import logging
@@ -8,24 +9,28 @@ from os.path import join as opj
 from datetime import datetime
 from shapely.wkt import loads
 
-from ost.helpers import vector as vec, raster as ras
-from ost.s1 import search, refine, s1_dl, burst, grd_batch
+from ost.helpers import vector as vec
+from ost.s1 import search, refine, s1_dl, grd_batch
 from ost.helpers import scihub, helpers as h
+from ost.settings import SNAP_S1_RESAMPLING_METHODS, ARD_TIMESCAN_METRIC
+
+from ost.errors import EmptyInventoryException
 
 logger = logging.getLogger(__name__)
 
 
 class Generic():
-
-    def __init__(self, project_dir, aoi,
+    def __init__(self,
+                 project_dir,
+                 aoi,
                  start='1978-06-28',
                  end=datetime.today().strftime("%Y-%m-%d"),
                  data_mount=None,
                  download_dir=None,
                  inventory_dir=None,
                  processing_dir=None,
-                 temp_dir=None):
-
+                 temp_dir=None
+                 ):
         self.project_dir = os.path.abspath(project_dir)
         self.start = start
         self.end = end
@@ -172,11 +177,14 @@ class Sentinel1(Generic):
 
     This subclass creates a Sentinel-1 specific
     '''
-    
-    def __init__(self, project_dir, aoi,
+    def __init__(self,
+                 project_dir,
+                 aoi,
                  start='2014-10-01',
                  end=datetime.today().strftime("%Y-%m-%d"),
                  data_mount='/eodata',
+                 mirror=2,
+                 metadata_concurency=1,
                  download_dir=None,
                  inventory_dir=None,
                  processing_dir=None,
@@ -187,7 +195,8 @@ class Sentinel1(Generic):
                  ):
 
         super().__init__(project_dir, aoi, start, end, data_mount,
-                         download_dir, inventory_dir, processing_dir, temp_dir)
+                         download_dir, inventory_dir, processing_dir, temp_dir
+                         )
 
         self.product_type = product_type
         self.beam_mode = beam_mode
@@ -198,8 +207,19 @@ class Sentinel1(Generic):
         self.refined_inventory_dict = None
         self.coverages = None
 
-    def search(self, outfile='full.inventory.shp', append=False,
-               uname=None, pword=None):
+        # Remote/Download options
+        self.mirror = mirror
+        self.metadata_concurency = metadata_concurency
+
+    def search(
+            self,
+            outfile=None,
+            append=False,
+            uname=None,
+            pword=None
+    ):
+        if outfile is None:
+            outfile = opj(self.inventory_dir, 'full_inventory.shp')
 
         # create scihub conform aoi string
         aoi_str = scihub.create_aoi_str(self.aoi)
@@ -213,16 +233,20 @@ class Sentinel1(Generic):
 
         # join the query
         query = scihub.create_query('Sentinel-1', aoi_str, toi_str,
-                                    product_specs_str)
-
+                                    product_specs_str
+                                    )
         if not uname or not pword:
             # ask for username and password
             uname, pword = scihub.ask_credentials()
 
         # do the search
         self.inventory_file = opj(self.inventory_dir, outfile)
-        search.scihub_catalogue(query, self.inventory_file, append,
-                                uname, pword)
+        search.scihub_catalogue(query,
+                                self.inventory_file,
+                                append,
+                                uname,
+                                pword
+                                )
         
         # read inventory into the inventory attribute
         self.read_inventory()
@@ -242,7 +266,8 @@ class Sentinel1(Generic):
                         'lastrelativeorbitnumber', 'lastorbitnumber',
                         'uuid', 'platformidentifier', 'missiondatatakeid',
                         'swathidentifier', 'ingestiondate',
-                        'sensoroperationalmode', 'geometry']
+                        'sensoroperationalmode', 'geometry'
+                        ]
 
         geodataframe = gpd.read_file(self.inventory_file)
         geodataframe.columns = column_names
@@ -251,11 +276,9 @@ class Sentinel1(Generic):
         # downloaded
         self.inventory = search.check_availability(
             geodataframe, self.download_dir, self.data_mount)
-        
-        # return geodataframe
+        return self.inventory
 
     def download_size(self, inventory_df=None):
-
         if inventory_df:
             download_size = inventory_df[
                 'size'].str.replace('GB', '').astype('float32').sum()
@@ -270,8 +293,8 @@ class Sentinel1(Generic):
                exclude_marginal=True,
                full_aoi_crossing=True,
                mosaic_refine=True,
-               area_reduce=0.05):
-
+               area_reduce=0.05
+               ):
         self.refined_inventory_dict, self.coverages = refine.search_refinement(
                                        self.aoi,
                                        self.inventory,
@@ -279,7 +302,8 @@ class Sentinel1(Generic):
                                        exclude_marginal=exclude_marginal,
                                        full_aoi_crossing=full_aoi_crossing,
                                        mosaic_refine=mosaic_refine,
-                                       area_reduce=area_reduce)
+                                       area_reduce=area_reduce
+        )
 
         # summing up information
         logger.debug('--------------------------------------------')
@@ -290,16 +314,25 @@ class Sentinel1(Generic):
             logger.debug('{} mosaics for mosaic key {}'.format(self.coverages[key], key)
                          )
 
-    def download(self, inventory_df, mirror=None, concurrent=2,
-                 uname=None, pword=None):
+    def download(
+            self,
+            mirror=None,
+            concurrent=2,
+            uname=None,
+            pword=None
+    ):
 
-        # if an old inventory exists dorp download_path
-        if 'download_path'in inventory_df:
-            inventory_df.drop('download_path', axis=1)
-        
+        # if an old inventory exists drop download_path
+        if 'download_path' in self.inventory:
+            self.inventory.drop('download_path', axis=1)
+        if self.inventory.empty:
+            raise EmptyInventoryException(
+                'Run search before downloading or processing!'
+            )
         # check if scenes exist
         inventory_df = search.check_availability(
-            inventory_df, self.download_dir, self.data_mount)
+            self.inventory, self.download_dir, self.data_mount
+        )
         
         # extract only those scenes that need to be downloaded
         download_df = inventory_df[inventory_df.download_path.isnull()]
@@ -314,26 +347,25 @@ class Sentinel1(Generic):
                                      mirror=mirror,
                                      concurrent=concurrent,
                                      uname=uname,
-                                     pword=pword)
+                                     pword=pword
+                                     )
 
-    def plot_inventory(self, inventory_df=None, transperancy=0.05):
-
+    def plot_inventory(self, inventory_df=None, transperancy=0.05, show=False):
         if inventory_df is None:
-            vec.plot_inventory(self.aoi, self.inventory, transperancy)
+            vec.plot_inventory(self.aoi, self.inventory, transperancy, show)
         else:
-            vec.plot_inventory(self.aoi, inventory_df, transperancy)
+            vec.plot_inventory(self.aoi, inventory_df, transperancy, show)
 
 
-class Sentinel1_SLCBatch(Sentinel1):
-    '''A Sentinel-1 specific subclass of the Generic OST class
-
-    This subclass creates a Sentinel-1 specific
-    '''
-
-    def __init__(self, project_dir, aoi,
+class Sentinel1Batch(Sentinel1):
+    def __init__(self,
+                 project_dir,
+                 aoi,
                  start='2014-10-01',
                  end=datetime.today().strftime("%Y-%m-%d"),
                  data_mount='/eodata',
+                 mirror=2,
+                 metadata_concurency=1,
                  download_dir=None,
                  inventory_dir=None,
                  processing_dir=None,
@@ -341,12 +373,14 @@ class Sentinel1_SLCBatch(Sentinel1):
                  product_type='SLC',
                  beam_mode='IW',
                  polarisation='*',
-                 ard_type='OST Plus'
+                 ard_type='OST'
                  ):
 
-        super().__init__(project_dir, aoi, start, end, data_mount,
-                         download_dir, inventory_dir, processing_dir, temp_dir,
-                         product_type, beam_mode, polarisation)
+        super().__init__(project_dir, aoi, start, end, data_mount, mirror,
+                         metadata_concurency, download_dir, inventory_dir,
+                         processing_dir, temp_dir, product_type, beam_mode,
+                         polarisation
+                         )
 
         self.ard_type = ard_type
         self.ard_parameters = {}
@@ -354,232 +388,8 @@ class Sentinel1_SLCBatch(Sentinel1):
         self.burst_inventory = None
         self.burst_inventory_file = None
 
-    def create_burst_inventory(self, key=None, refine=True, 
-                               uname=None, pword=None):
-
-        if key:
-            outfile = opj(self.inventory_dir,
-                          'bursts.{}.shp').format(key)
-            self.burst_inventory = burst.burst_inventory(
-                self.refined_inventory_dict[key],
-                outfile,
-                download_dir=self.download_dir,
-                data_mount=self.data_mount,
-                uname=uname, pword=pword)
-        else:
-            outfile = opj(self.inventory_dir,
-                          'bursts.full.shp')
-        
-            self.burst_inventory = burst.burst_inventory(
-                    self.inventory,
-                    outfile,
-                    download_dir=self.download_dir,
-                    data_mount=self.data_mount,
-                    uname=uname, pword=pword)
-
-        if refine:
-            # logger.debug('{}.refined.shp'.format(outfile[:-4]))
-            self.burst_inventory = burst.refine_burst_inventory(
-                    self.aoi, self.burst_inventory,
-                    '{}.refined.shp'.format(outfile[:-4])
-                    )
-
-    def read_burst_inventory(self, key):
-        '''Read the Sentinel-1 data inventory from a OST inventory shapefile
-
-        :param
-
-        '''
-
-        if key:
-            file = opj(self.inventory_dir, 'burst_inventory.{}.shp').format(
-                key)
-        else:
-            file = opj(self.inventory_dir, 'burst_inventory.shp')
-
-        # define column names of file (since in shp they are truncated)
-        # create column names for empty data frame
-        column_names = ['SceneID', 'Track', 'Direction', 'Date', 'SwathID',
-                        'AnxTime', 'BurstNr', 'geometry']
-
-        geodataframe = gpd.read_file(file)
-        geodataframe.columns = column_names
-        geodataframe['Date'] = geodataframe['Date'].astype(int)
-        geodataframe['BurstNr'] = geodataframe['BurstNr'].astype(int)
-        geodataframe['AnxTime'] = geodataframe['AnxTime'].astype(int)
-        geodataframe['Track'] = geodataframe['Track'].astype(int)
-        self.burst_inventory = geodataframe
-
-        return geodataframe
-
-    def set_ard_parameters(self, ard_type='OST Plus'):
-
-        if ard_type == 'OST Plus':
-
-            # scene specific
-            self.ard_parameters['type'] = ard_type
-            self.ard_parameters['resolution'] = 20
-            self.ard_parameters['border_noise'] = False
-            self.ard_parameters['product_type'] = 'RTC'
-            self.ard_parameters['to_db'] = False
-            self.ard_parameters['speckle_filter'] = False
-            self.ard_parameters['pol_speckle_filter'] = True
-            self.ard_parameters['ls_mask_create'] = True
-            self.ard_parameters['ls_mask_apply'] = False
-            self.ard_parameters['dem'] = 'SRTM 1Sec HGT'
-            self.ard_parameters['coherence'] = True
-            self.ard_parameters['polarimetry'] = True
-
-            # timeseries specific
-            self.ard_parameters['to_db_mt'] = True
-            self.ard_parameters['mt_speckle_filter'] = True
-            self.ard_parameters['datatype'] = 'float32'
-
-            # timescan specific
-            self.ard_parameters['metrics'] = ['avg', 'max', 'min',
-                                              'std', 'cov']
-            self.ard_parameters['outlier_removal'] = True
-
-        elif ard_type == 'Zhuo':
-
-            # scene specific
-            self.ard_parameters['type'] = ard_type
-            self.ard_parameters['resolution'] = 25
-            self.ard_parameters['border_noise'] = False
-            self.ard_parameters['product_type'] = 'RTC'
-            self.ard_parameters['to_db'] = False
-            self.ard_parameters['speckle_filter'] = True
-            self.ard_parameters['pol_speckle_filter'] = True
-            self.ard_parameters['ls_mask_create'] = False
-            self.ard_parameters['ls_mask_apply'] = False
-            self.ard_parameters['dem'] = 'SRTM 1Sec HGT'
-            self.ard_parameters['coherence'] = False
-            self.ard_parameters['polarimetry'] = True
-
-            # timeseries specific
-            self.ard_parameters['to_db_mt'] = False
-            self.ard_parameters['mt_speckle_filter'] = False
-            self.ard_parameters['datatype'] = 'float32'
-
-            # timescan specific
-            self.ard_parameters['metrics'] = ['avg', 'max', 'min',
-                                              'std', 'cov']
-            self.ard_parameters['outlier_removal'] = False
-
-        # assure that we do not convert twice to dB
-        if self.ard_parameters['to_db']:
-            self.ard_parameters['to_db_mt'] = False
-
-    def burst_to_ard(self, timeseries=False, timescan=False, mosaic=False,
-                     overwrite=False):
-
-        if overwrite:
-            logger.debug('INFO: Deleting processing folder to start from scratch')
-            h.remove_folder_content(self.processing_dir)
-
-        if not self.ard_parameters:
-            self.set_ard_parameters()
-
-        # set resolution in degree
-        self.center_lat = loads(self.aoi).centroid.y
-        if float(self.center_lat) > 59 or float(self.center_lat) < -59:
-            logger.debug('INFO: Scene is outside SRTM coverage. Will use 30m ASTER'
-                  'DEM instead.')
-            self.ard_parameters['dem'] = 'ASTER 1sec GDEM'
-
-        # set resolution to degree
-        # self.ard_parameters['resolution'] = h.resolution_in_degree(
-        #    self.center_lat, self.ard_parameters['resolution'])
-
-        nr_of_processed = len(
-            glob.glob(opj(self.processing_dir, '*', '*', '.processed')))
-
-        # check and retry function
-        i = 0
-        while len(self.burst_inventory) > nr_of_processed:
-
-            burst.burst_to_ard_batch(self.burst_inventory,
-                                     self.download_dir,
-                                     self.processing_dir,
-                                     self.temp_dir,
-                                     self.ard_parameters,
-                                     self.data_mount)
-
-            nr_of_processed = len(
-                glob.glob(opj(self.processing_dir, '*', '*', '.processed')))
-
-            i += 1
-
-            # not more than 5 trys
-            if i == 5:
-                break
-
-        # do we delete the downloads here?
-        if timeseries or timescan:
-            burst.burst_ards_to_timeseries(self.burst_inventory,
-                                           self.processing_dir,
-                                           self.temp_dir,
-                                           self.ard_parameters)
-
-            # do we deleete the single ARDs here?
-            if timescan:
-                burst.timeseries_to_timescan(self.burst_inventory,
-                                             self.processing_dir,
-                                             self.temp_dir,
-                                             self.ard_parameters)
-
-        if mosaic and timeseries:
-            burst.mosaic_timeseries(self.burst_inventory,
-                                  self.processing_dir,
-                                  self.temp_dir,
-                                  self.ard_parameters)
-
-        if mosaic and timescan:
-            burst.mosaic_timescan(self.burst_inventory,
-                                  self.processing_dir,
-                                  self.temp_dir,
-                                  self.ard_parameters)
-
-    def create_timeseries_animation(timeseries_dir, product_list, outfile, 
-                                    shrink_factor=1, duration=1, 
-                                    add_dates=False):
-        
-        ras.create_timeseries_animation(timeseries_dir, product_list, outfile, 
-                                    shrink_factor=1, duration=1, 
-                                    add_dates=False)
-
-
-class Sentinel1_GRDBatch(Sentinel1):
-    '''A Sentinel-1 specific subclass of the Generic OST class
-
-    This subclass creates a Sentinel-1 specific
-    '''
-
-    def __init__(self, project_dir, aoi,
-                 start='2014-10-01',
-                 end=datetime.today().strftime("%Y-%m-%d"),
-                 data_mount=None,
-                 download_dir=None,
-                 inventory_dir=None,
-                 processing_dir=None,
-                 temp_dir=None,
-                 product_type='GRD',
-                 beam_mode='IW',
-                 polarisation='*',
-                 ard_type='OST'
-                 ):
-
-        super().__init__(project_dir, aoi, start, end, data_mount,
-                         download_dir, inventory_dir, processing_dir, temp_dir,
-                         product_type, beam_mode, polarisation)
-
-        self.ard_type = ard_type
-        self.ard_parameters = {}
-        self.set_ard_parameters(ard_type)
-
     # processing related functions
     def set_ard_parameters(self, ard_type='OST'):
-
         if ard_type == 'OST':
             self.ard_parameters['type'] = ard_type
             self.ard_parameters['resolution'] = 20
@@ -590,18 +400,15 @@ class Sentinel1_GRDBatch(Sentinel1):
             self.ard_parameters['to_db'] = False
             self.ard_parameters['polarisation'] = 'VV,VH,HH,HV'
             self.ard_parameters['dem'] = 'SRTM 1Sec HGT'
-            
+            self.ard_parameters['resampling'] = SNAP_S1_RESAMPLING_METHODS[2]
             # time-series specific
             self.ard_parameters['mt_speckle_filter'] = True
             self.ard_parameters['to_db_mt'] = True
             self.ard_parameters['datatype'] = 'float32'
             self.ard_parameters['ls_mask_apply'] = False
-            
             # timescan specific
-            self.ard_parameters['metrics'] = ['avg', 'max', 'min',
-                                              'std', 'cov']
+            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRIC
             self.ard_parameters['outlier_removal'] = True
-            
         elif ard_type == 'OST_flat':
             self.ard_parameters['type'] = ard_type
             self.ard_parameters['resolution'] = 20
@@ -612,18 +419,15 @@ class Sentinel1_GRDBatch(Sentinel1):
             self.ard_parameters['to_db'] = False
             self.ard_parameters['polarisation'] = 'VV,VH,HH,HV'
             self.ard_parameters['dem'] = 'SRTM 1Sec HGT'
-            
+            self.ard_parameters['resampling'] = SNAP_S1_RESAMPLING_METHODS[2]
             # time-series specific
             self.ard_parameters['mt_speckle_filter'] = True
             self.ard_parameters['to_db_mt'] = True
             self.ard_parameters['datatype'] = 'float32'
             self.ard_parameters['ls_mask_apply'] = False
-            
             # timescan specific
-            self.ard_parameters['metrics'] = ['avg', 'max', 'min',
-                                              'std', 'cov']
+            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRIC
             self.ard_parameters['outlier_removal'] = True
-            
         elif ard_type == 'CEOS':
             self.ard_parameters['type'] = ard_type
             self.ard_parameters['resolution'] = 10
@@ -634,18 +438,15 @@ class Sentinel1_GRDBatch(Sentinel1):
             self.ard_parameters['to_db'] = False
             self.ard_parameters['polarisation'] = 'VV,VH,HH,HV'
             self.ard_parameters['dem'] = 'SRTM 1Sec HGT'
-            
+            self.ard_parameters['resampling'] = SNAP_S1_RESAMPLING_METHODS[3]
             # time-series specific
             self.ard_parameters['mt_speckle_filter'] = False
             self.ard_parameters['to_db_mt'] = False
             self.ard_parameters['datatype'] = 'float32'
             self.ard_parameters['ls_mask_apply'] = False
-            
             # timescan specific
-            self.ard_parameters['metrics'] = ['avg', 'max', 'min',
-                                              'std', 'cov']
+            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRIC
             self.ard_parameters['outlier_removal'] = False
-            
         elif ard_type == 'EarthEngine':
             self.ard_parameters['type'] = ard_type
             self.ard_parameters['resolution'] = 10
@@ -656,33 +457,188 @@ class Sentinel1_GRDBatch(Sentinel1):
             self.ard_parameters['to_db'] = True
             self.ard_parameters['polarisation'] = 'VV,VH,HH,HV'
             self.ard_parameters['dem'] = 'SRTM 1Sec HGT'
-
+            self.ard_parameters['resampling'] = SNAP_S1_RESAMPLING_METHODS[3]
             # time-series specific
             self.ard_parameters['mt_speckle_filter'] = False
             self.ard_parameters['to_db_mt'] = False
             self.ard_parameters['datatype'] = 'float32'
             self.ard_parameters['ls_mask_apply'] = False
-            
             # timescan specific
-            self.ard_parameters['metrics'] = ['avg', 'max', 'min',
-                                              'std', 'cov']
+            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRIC
             self.ard_parameters['outlier_removal'] = False
-    
-    def grd_to_ard(self, inventory_df=None, subset=None, timeseries=False, 
-                   timescan=False, mosaic=False, overwrite=False):
+        elif ard_type == 'Zhuo':
+            self.ard_parameters['type'] = ard_type
+            self.ard_parameters['resolution'] = 25
+            self.ard_parameters['border_noise'] = False
+            self.ard_parameters['product_type'] = 'RTC'
+            self.ard_parameters['speckle_filter'] = True
+            self.ard_parameters['ls_mask_create'] = True
+            self.ard_parameters['to_db'] = True
+            self.ard_parameters['dem'] = 'SRTM 1Sec HGT'
+            self.ard_parameters['resampling'] = SNAP_S1_RESAMPLING_METHODS[2]
+            # time-series specific
+            self.ard_parameters['mt_speckle_filter'] = False
+            self.ard_parameters['to_db_mt'] = False
+            self.ard_parameters['datatype'] = 'float32'
+            self.ard_parameters['ls_mask_apply'] = False
+            # timescan specific
+            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRIC
+            self.ard_parameters['outlier_removal'] = False
 
+
+class Sentinel1GRDBatch(Sentinel1):
+    '''A Sentinel-1 specific subclass of the Generic OST class
+
+    This subclass creates a Sentinel-1 specific
+    '''
+    def __init__(self,
+                 project_dir,
+                 aoi,
+                 start='2014-10-01',
+                 end=datetime.today().strftime("%Y-%m-%d"),
+                 data_mount='/eodata',
+                 mirror=2,
+                 metadata_concurency=1,
+                 download_dir=None,
+                 inventory_dir=None,
+                 processing_dir=None,
+                 temp_dir=None,
+                 product_type='SLC',
+                 beam_mode='IW',
+                 polarisation='*',
+                 ard_type='OST'
+                 ):
+
+        super().__init__(project_dir, aoi, start, end, data_mount, mirror,
+                         metadata_concurency, download_dir, inventory_dir,
+                         processing_dir, temp_dir, product_type, beam_mode,
+                         polarisation
+                         )
+
+        self.ard_type = ard_type
+        self.ard_parameters = {}
+        self.set_ard_parameters(ard_type)
+
+    # processing related functions
+    def set_ard_parameters(self, ard_type='OST'):
+        if ard_type == 'OST':
+            self.ard_parameters['type'] = ard_type
+            self.ard_parameters['resolution'] = 20
+            self.ard_parameters['border_noise'] = True
+            self.ard_parameters['product_type'] = 'GTCgamma'
+            self.ard_parameters['speckle_filter'] = False
+            self.ard_parameters['ls_mask_create'] = False
+            self.ard_parameters['to_db'] = False
+            self.ard_parameters['polarisation'] = 'VV,VH,HH,HV'
+            self.ard_parameters['dem'] = 'SRTM 1Sec HGT'
+            self.ard_parameters['resampling'] = SNAP_S1_RESAMPLING_METHODS[2]
+            # time-series specific
+            self.ard_parameters['mt_speckle_filter'] = True
+            self.ard_parameters['to_db_mt'] = True
+            self.ard_parameters['datatype'] = 'float32'
+            self.ard_parameters['ls_mask_apply'] = False
+            # timescan specific
+            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRIC
+            self.ard_parameters['outlier_removal'] = True
+        elif ard_type == 'OST_flat':
+            self.ard_parameters['type'] = ard_type
+            self.ard_parameters['resolution'] = 20
+            self.ard_parameters['border_noise'] = True
+            self.ard_parameters['product_type'] = 'RTC'
+            self.ard_parameters['speckle_filter'] = False
+            self.ard_parameters['ls_mask_create'] = True
+            self.ard_parameters['to_db'] = False
+            self.ard_parameters['polarisation'] = 'VV,VH,HH,HV'
+            self.ard_parameters['dem'] = 'SRTM 1Sec HGT'
+            self.ard_parameters['resampling'] = SNAP_S1_RESAMPLING_METHODS[2]
+            # time-series specific
+            self.ard_parameters['mt_speckle_filter'] = True
+            self.ard_parameters['to_db_mt'] = True
+            self.ard_parameters['datatype'] = 'float32'
+            self.ard_parameters['ls_mask_apply'] = False
+            # timescan specific
+            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRIC
+            self.ard_parameters['outlier_removal'] = True
+        elif ard_type == 'CEOS':
+            self.ard_parameters['type'] = ard_type
+            self.ard_parameters['resolution'] = 10
+            self.ard_parameters['border_noise'] = True
+            self.ard_parameters['product_type'] = 'RTC'
+            self.ard_parameters['speckle_filter'] = False
+            self.ard_parameters['ls_mask_create'] = False
+            self.ard_parameters['to_db'] = False
+            self.ard_parameters['polarisation'] = 'VV,VH,HH,HV'
+            self.ard_parameters['dem'] = 'SRTM 1Sec HGT'
+            # time-series specific
+            self.ard_parameters['mt_speckle_filter'] = False
+            self.ard_parameters['to_db_mt'] = False
+            self.ard_parameters['datatype'] = 'float32'
+            self.ard_parameters['ls_mask_apply'] = False
+            self.ard_parameters['resampling'] = SNAP_S1_RESAMPLING_METHODS[3]
+            # timescan specific
+            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRIC
+            self.ard_parameters['outlier_removal'] = False
+        elif ard_type == 'EarthEngine':
+            self.ard_parameters['type'] = ard_type
+            self.ard_parameters['resolution'] = 10
+            self.ard_parameters['border_noise'] = True
+            self.ard_parameters['product_type'] = 'GTCsigma'
+            self.ard_parameters['speckle_filter'] = False
+            self.ard_parameters['ls_mask_create'] = False
+            self.ard_parameters['to_db'] = True
+            self.ard_parameters['polarisation'] = 'VV,VH,HH,HV'
+            self.ard_parameters['dem'] = 'SRTM 1Sec HGT'
+            self.ard_parameters['resampling'] = SNAP_S1_RESAMPLING_METHODS[3]
+            # time-series specific
+            self.ard_parameters['mt_speckle_filter'] = False
+            self.ard_parameters['to_db_mt'] = False
+            self.ard_parameters['datatype'] = 'float32'
+            self.ard_parameters['ls_mask_apply'] = False
+            # timescan specific
+            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRIC
+            self.ard_parameters['outlier_removal'] = False
+        elif ard_type == 'Zhuo':
+            self.ard_parameters['type'] = ard_type
+            self.ard_parameters['resolution'] = 25
+            self.ard_parameters['border_noise'] = False
+            self.ard_parameters['product_type'] = 'RTC'
+            self.ard_parameters['speckle_filter'] = True
+            self.ard_parameters['ls_mask_create'] = True
+            self.ard_parameters['to_db'] = True
+            self.ard_parameters['dem'] = 'SRTM 1Sec HGT'
+            self.ard_parameters['resampling'] = SNAP_S1_RESAMPLING_METHODS[2]
+            # time-series specific
+            self.ard_parameters['mt_speckle_filter'] = False
+            self.ard_parameters['to_db_mt'] = False
+            self.ard_parameters['datatype'] = 'float32'
+            self.ard_parameters['ls_mask_apply'] = False
+            # timescan specific
+            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRIC
+            self.ard_parameters['outlier_removal'] = False
+
+    def grd_to_ard(self,
+                   subset=None,
+                   timeseries=False,
+                   timescan=False,
+                   mosaic=False,
+                   overwrite=False
+                   ):
         if overwrite:
             logger.debug('INFO: Deleting processing folder to start from scratch')
             h.remove_folder_content(self.processing_dir)
 
         if not self.ard_parameters:
             self.set_ard_parameters()
-
+        if self.inventory.empty:
+            raise EmptyInventoryException(
+                'Run search before downloading and processing!'
+            )
         # set resolution in degree
         self.center_lat = loads(self.aoi).centroid.y
         if float(self.center_lat) > 59 or float(self.center_lat) < -59:
             logger.debug('INFO: Scene is outside SRTM coverage. Will use 30m ASTER'
-                  'DEM instead.')
+                         'DEM instead.'
+                         )
             self.ard_parameters['dem'] = 'ASTER 1sec GDEM'
 
         if subset:
@@ -690,54 +646,54 @@ class Sentinel1_GRDBatch(Sentinel1):
                 subset = str(vec.shp_to_wkt(subset, buffer=0.1, envelope=True))
             elif subset.startswith('POLYGON (('):
                 subset = loads(subset).buffer(0.1).to_wkt()
+            elif subset.geom_type == 'MultiPolygon' or subset.geom_type == 'Polygon':
+                subset = subset.wkt
             else:
                 logger.debug('ERROR: No valid subset given.'
-                      'Should be either path to a shapefile or a WKT Polygon.')
+                             'Should be either path to a shapefile or a WKT Polygon.'
+                             )
                 sys.exit()
-            # set resolution to degree
-        # self.ard_parameters['resolution'] = h.resolution_in_degree(
-        #    self.center_lat, self.ard_parameters['resolution'])
 
         nr_of_processed = len(
             glob.glob(opj(self.processing_dir, '*', '20*', '.processed')))
 
         # check and retry function
         i = 0
-        while len(inventory_df.groupby(['relativeorbit', 'acquisitiondate'])) > nr_of_processed:
-
+        while len(
+                self.inventory.groupby(['relativeorbit', 'acquisitiondate'])
+        ) > nr_of_processed:
             grd_batch.grd_to_ard_batch(
-                                  inventory_df,
-                                  self.download_dir,
-                                  self.processing_dir,
-                                  self.temp_dir,
-                                  self.ard_parameters,
-                                  subset,
-                                  self.data_mount
-                                  )
+                self.inventory,
+                self.download_dir,
+                self.processing_dir,
+                self.temp_dir,
+                self.ard_parameters,
+                subset,
+                self.data_mount
+            )
             
             nr_of_processed = len(
-                glob.glob(opj(self.processing_dir, '*', '20*', '.processed')))
+                glob.glob(opj(self.processing_dir, '*', '20*', '.processed'))
+            )
             
             i += 1
-            
             # not more than 5 trys
             if i == 5:
                 break
 
         if timeseries or timescan:
             nr_of_processed = len(
-            glob.glob(opj(self.processing_dir, '*', 'Timeseries', '.processed')))
-        
+                glob.glob(opj(self.processing_dir, '*', 'Timeseries', '.processed'))
+            )
             # nr_of_tracks = inventory_df.relativeorbit.unique().values
             # check and retry function
             i = 0
-            while len(inventory_df.relativeorbit.unique()) > nr_of_processed:
-        
-                grd_batch.ards_to_timeseries(inventory_df, 
-                                    self.processing_dir, 
-                                    self.temp_dir, 
-                                    self.ard_parameters)
-                
+            while len(self.inventory.relativeorbit.unique()) > nr_of_processed:
+                grd_batch.ards_to_timeseries(self.inventory,
+                                             self.processing_dir,
+                                             self.temp_dir,
+                                             self.ard_parameters
+                                             )
                 nr_of_processed = len(
                     glob.glob(opj(self.processing_dir, '*',
                                   'Timeseries', '.processed')))
@@ -748,42 +704,28 @@ class Sentinel1_GRDBatch(Sentinel1):
                     break
             
         if timescan:
-            
-            nr_of_processed = len(glob.glob(opj(
-                self.processing_dir, '*', 'Timescan', '.processed')))
-            
+            nr_of_processed = len(
+                glob.glob(opj(
+                    self.processing_dir, '*', 'Timescan', '.processed')
+                )
+            )
             i = 0
-            while len(inventory_df.relativeorbit.unique()) > nr_of_processed:
-            
-                 grd_batch.timeseries_to_timescan(
-                         inventory_df,
-                         self.processing_dir,
-                         self.ard_parameters)
-                 
-                 nr_of_processed = len(glob.glob(opj(
+            while len(self.inventory.relativeorbit.unique()) > nr_of_processed:
+                grd_batch.timeseries_to_timescan(
+                    self.inventory,
+                    self.processing_dir,
+                    self.ard_parameters
+                )
+                nr_of_processed = len(glob.glob(opj(
                     self.processing_dir, '*', 'Timescan', '.processed')))
-                 
-                 i += 1
+                i += 1
         
                 # not more than 5 trys
-                 if i == 5:
-                     break
-                
+                if i == 5:
+                    break
         if mosaic and timeseries and not subset:
-            grd_batch.mosaic_timeseries(inventory_df,
-                                  self.processing_dir,
-                                  self.temp_dir)
-
-        if mosaic and timescan and not subset:
-            grd_batch.mosaic_timescan(inventory_df,
-                                  self.processing_dir,
-                                  self.temp_dir,
-                                  self.ard_parameters)
-#            nr_of_processed = len(
-#                glob.glob(opj(self.processing_dir, '*', '*', '.processed')))
-#
-#            i += 1
-#
-#            # not more than 5 trys
-#            if i == 5:
-#                break
+            grd_batch.mosaic_timeseries(
+                self.inventory,
+                self.processing_dir,
+                self.temp_dir
+            )

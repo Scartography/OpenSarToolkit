@@ -322,7 +322,7 @@ def resolution_in_degree(latitude, meters):
     return (meters/r)*radians_to_degrees
 
 
-def zip_s1_safe_dir(dir_path, zip_path, product_id):
+def _zip_s1_safe_dir(dir_path, zip_path, product_id):
     zipf = zipfile.ZipFile(zip_path, mode='w')
     len_dir = len(dir_path)
     for root, _, files in os.walk(dir_path):
@@ -332,9 +332,10 @@ def zip_s1_safe_dir(dir_path, zip_path, product_id):
             if '.downloaded' not in zip_path:
                 zipf.write(file_path, product_id+'.SAFE'+file_path[len_dir:])
     zipf.close()
+    return zip_path
 
 
-def _slc_zip_to_processing_dir(
+def _product_zip_to_processing_dir(
         processing_dir,
         product,
         product_path
@@ -347,17 +348,24 @@ def _slc_zip_to_processing_dir(
                                  product.day
                                  )
     os.makedirs(download_path, exist_ok=True)
-
+    if os.path.isdir(product_path):
+        product_path = _zip_s1_safe_dir(
+            dir_path=product_path,
+            zip_path=opj(
+                processing_dir, os.path.basename(product_path)+'.zip'
+            ),
+            product_id=product.scene_id
+        )
     if not os.path.exists(
             os.path.join(download_path, os.path.basename(product_path))
     ):
         shutil.copy(product_path, download_path)
-        with open(
-                os.path.join(
-                    download_path, os.path.basename(product_path)
-                )+'.downloaded', 'w'
-        ) as zip_dl:
-            zip_dl.write('1')
+    with open(
+            os.path.join(
+                download_path, os.path.basename(product_path)
+            )+'.downloaded', 'w'
+    ) as zip_dl:
+        zip_dl.write('1')
 
 
 def execute_ard(

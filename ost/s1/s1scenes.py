@@ -7,16 +7,22 @@ from tempfile import TemporaryDirectory
 from shapely.wkt import loads as shp_loads
 
 from ost.s1.s1scene import Sentinel1Scene as S1scene
-from ost.helpers.helpers import _slc_zip_to_processing_dir
+from ost.helpers.helpers import _product_zip_to_processing_dir
 from ost.helpers.bursts import get_bursts_pairs
 from ost.s1.burst_to_ard import _2products_coherence_tc
+from ost.s1.ts import create_grd_stack, mt_speckle_filter
 
 logger = logging.getLogger(__name__)
 
 
 class Sentinel1Scenes:
-
-    def __init__(self, filelist, processing_dir=None, ard_type='OST', cleanup=False):
+    def __init__(
+            self,
+            filelist,
+            processing_dir=None,
+            ard_type='OST',
+            cleanup=False
+    ):
         slave_list = []
         for idx, s in zip(range(len(filelist)), filelist):
             if isinstance(s, S1scene):
@@ -29,7 +35,7 @@ class Sentinel1Scenes:
                 else:
                     self.master = S1scene(scene_id=scene_id)
                     # Copy files to processing dir
-                    _slc_zip_to_processing_dir(
+                    _product_zip_to_processing_dir(
                         processing_dir=processing_dir,
                         product=self.master,
                         product_path=s
@@ -40,19 +46,49 @@ class Sentinel1Scenes:
                 else:
                     slave_list.append(S1scene(scene_id=scene_id))
                     # Copy files to processing dir
-                    _slc_zip_to_processing_dir(
+                    _product_zip_to_processing_dir(
                         processing_dir=processing_dir,
                         product=S1scene(scene_id=scene_id),
                         product_path=s
                     )
+
         self.slaves = slave_list
         self.cleanup = cleanup
+        if processing_dir is None:
+            processing_dir = TemporaryDirectory()
+        self.processing_dir = processing_dir
 
         # ARD type is controled by master, kinda makes sense doesn't it
         self.ard_type = ard_type
         if ard_type is not None:
             self.master.set_ard_parameters(ard_type)
             self.master.ard_parameters['product_type'] = (ard_type)
+
+    def create_grd_stack(self):
+        if self.master.product_type == 'SLC':
+            raise TypeError(
+                'For S1 TOPS SLC products, TOPS Coregistration should be used'
+            )
+        out_stack = opj(self.processing_dir, self.master.scene_id)
+        filelist = [self.master.get_path(download_dir=self.processing_dir)]
+        for slave in self.slaves:
+            filelist.append(slave.get_path(download_dir=self.processing_dir))
+        create_grd_stack(
+            filelist=filelist,
+            out_stack=out_stack,
+            logfile=logger,
+            polarisation='VV,VH,HH,HV',
+            pattern=None
+        )
+        self.out_stack = out_stack
+        return out_stack
+
+    def import_slc(self,
+                   processing_dir,
+                   subset
+                   ):
+        slc_import_dict = {}
+        self.slc_import_dict = slc_import_dict
 
     def s1_scenes_to_ard(self,
                          processing_dir,
