@@ -3,6 +3,7 @@ FROM $BASE_CONTAINER
 
 USER root
 
+ENV HOME=/home/$NB_USER
 ENV OTB_VERSION="7.0.0" \
     TBX_VERSION="7" \
     TBX_SUBVERSION="0"
@@ -12,8 +13,8 @@ ENV TBX="esa-snap_sentinel_unix_${TBX_VERSION}_${TBX_SUBVERSION}.sh" \
   HOME=$HOME \
   PATH=$PATH:$HOME/programs/snap/bin:$HOME/programs/OTB-${OTB_VERSION}-Linux64/bin
 
-RUN sed -i -e 's:(groups):(groups 2>/dev/null):' /etc/bash.bashrc && \
-    mkdir $HOME/programs
+RUN sed -i -e 's:(groups):(groups 2>/dev/null):' /etc/bash.bashrc
+
 
 # install gdal as root
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -yq libgdal-dev \
@@ -23,10 +24,29 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -yq libgdal
     rm -rf /var/lib/apt/lists/*  && \
     alias python=python3
 
+# Grant access to folders for user
+RUN fix-permissions $HOME && \
+    mkdir $HOME/programs && \
+    fix-permissions $HOME/programs
 USER $NB_UID
-ENV HOME=/home/$NB_USER
 
-# as regular user
+RUN conda install  --quiet --yes \
+    oauthlib \
+    gdal \
+    fiona \
+    rasterio \
+    shapely \
+    xarray \
+    zarr \
+    psycopg2 \
+    geopandas \
+    cartopy \
+    tqdm \
+    lightgbm && \
+    conda clean --all -f -y && \
+    fix-permissions $CONDA_DIR
+
+# jupyter geojson as regular user
 RUN jupyter labextension install @jupyterlab/geojson-extension
 
 # copy the snap installation config file into the container
@@ -58,10 +78,6 @@ RUN cd $HOME && \
     git clone https://github.com/Scartography/OST_Notebooks.git && \
     cd $HOME/OST_Notebooks && \
     git checkout SLC_processing
-
-USER root
-RUN fix-permissions $HOME
-USER $NB_UID
 
 # setup jupyter hub and expose the environment
 EXPOSE 8888
