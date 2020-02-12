@@ -198,7 +198,7 @@ class Sentinel1Scenes:
                             logger.debug('Burst %s is empty', m_burst_id)
                             continue
                         elif return_code != 0:
-                            print(return_code)
+                            logger.debug(return_code)
                             raise RuntimeError
                         out_file = opj(processing_dir, str(m_burst_id)+'_coh.dim')
                         if os.path.isfile(out_file):
