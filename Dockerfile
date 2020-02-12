@@ -18,21 +18,13 @@ RUN sed -i -e 's:(groups):(groups 2>/dev/null):' /etc/bash.bashrc && \
 USER $NB_UID
 ENV HOME=/home/$NB_USER
 
-RUN conda install  --quiet --yes \
-    oauthlib \
-    gdal \
-    fiona \
-    rasterio \
-    shapely \
-    xarray \
-    zarr \
-    psycopg2 \
-    geopandas \
-    cartopy \
-    tqdm \
-    lightgbm && \
-    conda clean --all -f -y && \
-    fix-permissions $CONDA_DIR
+# install gdal
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -yq libgdal-dev \
+    python3-gdal \
+    libspatialindex-dev \
+    libgfortran3 && \
+    rm -rf /var/lib/apt/lists/*  && \
+    alias python=python3
 
 RUN jupyter labextension install @jupyterlab/geojson-extension
 
@@ -69,3 +61,8 @@ RUN cd $HOME && \
 USER root
 RUN fix-permissions $HOME
 USER $NB_UID
+
+# setup jupyter hub and expose the environment
+EXPOSE 8888
+RUN cd $HOME
+CMD jupyter lab --ip='0.0.0.0' --port=8888 --no-browser --allow-root
