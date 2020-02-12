@@ -42,7 +42,8 @@ RUN conda install  --quiet --yes \
     geopandas \
     cartopy \
     tqdm \
-    lightgbm && \
+    lightgbm \
+    descartes && \
     conda clean --all -f -y && \
     fix-permissions $CONDA_DIR
 
@@ -79,7 +80,5 @@ RUN cd $HOME && \
     cd $HOME/OST_Notebooks && \
     git checkout SLC_processing
 
-# setup jupyter hub and expose the environment
-EXPOSE 8888
+# Return Home
 RUN cd $HOME
-CMD jupyter lab --ip='0.0.0.0' --port=8888 --no-browser --allow-root

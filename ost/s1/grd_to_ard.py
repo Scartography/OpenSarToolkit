@@ -96,7 +96,7 @@ def _grd_frame_import(infile, outfile, logfile, polarisation='VV,VH,HH,HV'):
                      default value: 'VV,VH,HH,HV'
     '''
 
-    logger.debug('INFO: Importing {} by applying precise orbit file and'
+    logger.debug('INFO: Importing {} by applying precise orbit file and '
                  'removing thermal noise'.format(os.path.basename(infile))
                  )
 
@@ -132,7 +132,7 @@ def _grd_frame_import_subset(infile, outfile, georegion,
     SAFE format), updates the orbit information (does not fail if not
     available), removes the thermal noise, subsets it to the given georegion
     and stores it as a SNAP
-    compatible EAM-Dimap format.
+    compatible BEAM-Dimap format.
 
 
     Args:
@@ -150,7 +150,7 @@ def _grd_frame_import_subset(infile, outfile, georegion,
     '''
 
     logger.debug(
-        'INFO: Importing {} by applying precise orbit file and'
+        'INFO: Importing {} by applying precise orbit file and '
         'removing thermal noise, as well as subsetting.'.format(os.path.basename(infile))
     )
 
@@ -202,7 +202,7 @@ def _slice_assembly(filelist, outfile, logfile, polarisation='VV,VH,HH,HV'):
 
     # construct command
     command = '{} SliceAssembly -x -q {} -PselectedPolarisations={} \
-               -t \'{}\'{}'.format(
+               -t \'{}\' {}'.format(
         gpt_file, 2 * os.cpu_count(), polarisation, outfile, filelist)
 
     # run command and get return code
@@ -242,7 +242,7 @@ def _grd_subset(infile, outfile, logfile, region):
     region = ','.join([str(int(x)) for x in region])
 
     # construct command
-    command = '{} Subset -x -q {} -Pregion={} -t \'{}\'\'{}\''.format(
+    command = '{} Subset -x -q {} -Pregion={} -t \'{}\' \'{}\''.format(
         gpt_file, os.cpu_count(), region, outfile, infile)
 
     # run command and get return code
@@ -275,14 +275,14 @@ def _grd_subset_georegion(infile, outfile, logfile, georegion):
         georegion (str): a WKT style formatted POLYGON that bounds the
                    subset region
     '''
-    
+
     logger.debug('INFO: Subsetting imported imagery.')
     # get Snap's gpt file
     gpt_file = h.gpt_path()
 
     # extract window from scene
-    command = '{} Subset -x -q {} -Ssource=\'{}\'-t \'{}\'\
-                 -PcopyMetadata=true -PgeoRegion=\'{}\''.format(
+    command = '{} Subset -x -q {} -Ssource=\'{}\' -t "{}" \
+                 -PcopyMetadata=true -PgeoRegion="{}"'.format(
         gpt_file, 2 * os.cpu_count(), infile, outfile, georegion)
 
     # run command and get return code
@@ -465,7 +465,7 @@ def _grd_backscatter(
 
     # construct command sring
     if product_type == 'RTC':
-        command = '{} {} -x -q {} -Pinput=\'{}\' -Pdem=\'{}\' \
+        command = '{} {} -x -q {} -Pinput="{}" -Pdem=\'{}\' \
                    -Pdem_file=\'{}\' -Pdem_nodata={} -Presampling={} \
                    -Poutput=\'{}\''.format(gpt_file, graph, 2 * os.cpu_count(),
                                            infile, dem, dem_file, dem_nodata, resampling,
@@ -834,9 +834,7 @@ def grd_to_ard(filelist,
 
     # slice assembly if more than one scene
     if len(filelist) > 1:
-
         for file in filelist:
-
             grd_import = opj(temp_dir, '{}_imported'.format(
                 os.path.basename(file)[:-5]))
             logfile = opj(output_dir, '{}_Import.errLog'.format(
@@ -850,12 +848,14 @@ def grd_to_ard(filelist,
         # create list of scenes for full acquisition in
         # preparation of slice assembly
         scenelist = ' '.join(glob.glob(opj(temp_dir, '*imported.dim')))
+        logger.debug('Merging slices: %s', scenelist)
 
         # create file strings
         grd_import = opj(temp_dir, '{}_imported'.format(out_prefix))
         logfile = opj(output_dir, '{}_slice_assembly.errLog'.format(out_prefix))
         return_code = _slice_assembly(scenelist, grd_import, logfile,
-                                      polarisation)
+                                      polarisation
+                                      )
         if return_code != 0:
             h.remove_folder_content(temp_dir)
             return return_code
@@ -863,7 +863,6 @@ def grd_to_ard(filelist,
         for file in filelist:
             h.delete_dimap(opj(temp_dir, '{}_imported'.format(
                 os.path.basename(str(file))[:-5])))
-
         if subset:
             grd_subset = opj(temp_dir, '{}_imported_subset'.format(out_prefix))
             return_code = _grd_subset_georegion('{}.dim'.format(grd_import),
@@ -874,7 +873,7 @@ def grd_to_ard(filelist,
 
             # delete slice assembly
             h.delete_dimap(grd_import)
-    
+
     # single scene case
     else:
         grd_import = opj(temp_dir, '{}_imported'.format(out_prefix))
@@ -885,8 +884,8 @@ def grd_to_ard(filelist,
                                             polarisation)
         else:
             # georegion = vec.shp_to_wkt(subset, buffer=0.1, envelope=True)
-            return_code = _grd_frame_import_subset(filelist[0], grd_import, 
-                                                   subset, logfile, 
+            return_code = _grd_frame_import_subset(filelist[0], grd_import,
+                                                   subset, logfile,
                                                    polarisation)
         if return_code != 0:
             h.remove_folder_content(temp_dir)
@@ -925,7 +924,13 @@ def grd_to_ard(filelist,
         return return_code
 
     data_dir = glob.glob(opj(temp_dir, '{}*imported.data'.format(out_prefix)))
-    h.delete_dimap(str(data_dir[0])[:-5])
+    if isinstance(data_dir , list):
+        for d in data_dir:
+            if d != [] and os.path.isdir(d):
+                h.delete_dimap(str(d)[:-5])
+    else:
+        if d != [] and os.path.isdir(data_dir):
+            h.delete_dimap(str(data_dir)[:-5])
 
     infile = opj(temp_dir, '{}_{}.dim'.format(out_prefix, product_type))
     # -------------------------------------------

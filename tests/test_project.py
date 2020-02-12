@@ -84,10 +84,10 @@ def test_sentinel1_grd_batch(some_bounds):
             subset=box(
                 some_bounds[0], some_bounds[1], some_bounds[2], some_bounds[3]
             ).wkt,
-            timeseries=False,
-            timescan=False,
-            mosaic=False,
-            overwrite=False
+            timeseries=True,
+            timescan=True,
+            mosaic=True,
+            overwrite=True
         )
 
 
