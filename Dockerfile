@@ -15,10 +15,7 @@ ENV TBX="esa-snap_sentinel_unix_${TBX_VERSION}_${TBX_SUBVERSION}.sh" \
 RUN sed -i -e 's:(groups):(groups 2>/dev/null):' /etc/bash.bashrc && \
     mkdir $HOME/programs
 
-USER $NB_UID
-ENV HOME=/home/$NB_USER
-
-# install gdal
+# install gdal as root
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -yq libgdal-dev \
     python3-gdal \
     libspatialindex-dev \
@@ -26,6 +23,10 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -yq libgdal
     rm -rf /var/lib/apt/lists/*  && \
     alias python=python3
 
+USER $NB_UID
+ENV HOME=/home/$NB_USER
+
+# as regular user
 RUN jupyter labextension install @jupyterlab/geojson-extension
 
 # copy the snap installation config file into the container
