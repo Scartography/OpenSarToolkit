@@ -278,7 +278,7 @@ def mt_metrics(
                           if 'cov' in metrics else False
                           )
             arr['count'] = (np.nan_to_num(
-                np.where(stack > 0, arr['count'] + 1, arr['count'])
+                np.count_nonzero(stack, axis=0)
             )
                           if 'count' in metrics else False
                           )

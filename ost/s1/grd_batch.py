@@ -319,18 +319,10 @@ def ards_to_timeseries(
                     # if os.path.isdir('{}.data'.format(out_stack)):
                     h.delete_dimap(out_stack)
 
-            for file in all_outfiles:
-                return_code = h.check_out_tiff(file)
-                if return_code != 0:
-                    h.remove_folder_content(temp_dir)
-                    h.remove_folder_content(opj(track_dir, 'Timeseries'))
-                    return return_code
-
             # write file, so we know this ts has been succesfully processed
-            if return_code == 0:
-                check_file = opj(track_dir, 'Timeseries', '.processed')
-                with open(str(check_file), 'w') as file:
-                    file.write('passed all tests \n')
+            check_file = opj(track_dir, 'Timeseries', '.processed')
+            with open(str(check_file), 'w') as file:
+                file.write('passed all tests \n')
 
 
 def timeseries_to_timescan(
@@ -355,10 +347,8 @@ def timeseries_to_timescan(
     for track, allScenes in processing_dict.items():
 
         logger.debug('INFO: Entering track {}.'.format(track))
-
         # get track directory
         track_dir = opj(processing_dir, track)
-
         if os.path.isfile(opj(track_dir, 'Timescan', '.processed')):
             logger.debug('INFO: Timescans for track {} already processed.'.format(track))
         else:
@@ -366,10 +356,8 @@ def timeseries_to_timescan(
             # define and create Timescan directory
             timescan_dir = opj(track_dir, 'Timescan')
             os.makedirs(timescan_dir, exist_ok=True)
-
             # loop thorugh each polarization
             for p in ['VV', 'VH', 'HH', 'HV']:
-
                 # Get timeseries vrt
                 timeseries = opj(
                     track_dir,
