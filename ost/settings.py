@@ -187,7 +187,7 @@ SNAP_S1_RESAMPLING_METHODS = [
 
 SINGLE_ARD_OPTIONS = ['OST', 'OST Flat', 'CEOS', 'Earth Engine']
 ARD_PRODUCT_TYPES = ['RTC', 'GTCgamma', 'GTCsigma']
-ARD_TIMESCAN_METRIC = ['avg', 'max', 'min', 'std', 'cov']
+ARD_TIMESCAN_METRICS = ['avg', 'max', 'min', 'std', 'cov', 'count']
 POLARIZATION_OPTIONS = ['VV', 'VV VH', 'HH', 'HH HV']
 
 DEM_NAMES = ["SRTM 1Sec HGT", "External DEM"]

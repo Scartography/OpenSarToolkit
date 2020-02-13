@@ -12,7 +12,7 @@ from shapely.wkt import loads
 from ost.helpers import vector as vec
 from ost.s1 import search, refine, s1_dl, grd_batch
 from ost.helpers import scihub, helpers as h
-from ost.settings import SNAP_S1_RESAMPLING_METHODS, ARD_TIMESCAN_METRIC
+from ost.settings import SNAP_S1_RESAMPLING_METHODS, ARD_TIMESCAN_METRICS
 
 from ost.errors import EmptyInventoryException
 
@@ -407,7 +407,7 @@ class Sentinel1Batch(Sentinel1):
             self.ard_parameters['datatype'] = 'float32'
             self.ard_parameters['ls_mask_apply'] = False
             # timescan specific
-            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRIC
+            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRICS
             self.ard_parameters['outlier_removal'] = True
         elif ard_type == 'OST_flat':
             self.ard_parameters['type'] = ard_type
@@ -426,7 +426,7 @@ class Sentinel1Batch(Sentinel1):
             self.ard_parameters['datatype'] = 'float32'
             self.ard_parameters['ls_mask_apply'] = False
             # timescan specific
-            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRIC
+            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRICS
             self.ard_parameters['outlier_removal'] = True
         elif ard_type == 'CEOS':
             self.ard_parameters['type'] = ard_type
@@ -445,7 +445,7 @@ class Sentinel1Batch(Sentinel1):
             self.ard_parameters['datatype'] = 'float32'
             self.ard_parameters['ls_mask_apply'] = False
             # timescan specific
-            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRIC
+            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRICS
             self.ard_parameters['outlier_removal'] = False
         elif ard_type == 'EarthEngine':
             self.ard_parameters['type'] = ard_type
@@ -464,7 +464,7 @@ class Sentinel1Batch(Sentinel1):
             self.ard_parameters['datatype'] = 'float32'
             self.ard_parameters['ls_mask_apply'] = False
             # timescan specific
-            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRIC
+            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRICS
             self.ard_parameters['outlier_removal'] = False
         elif ard_type == 'Zhuo':
             self.ard_parameters['type'] = ard_type
@@ -482,7 +482,7 @@ class Sentinel1Batch(Sentinel1):
             self.ard_parameters['datatype'] = 'float32'
             self.ard_parameters['ls_mask_apply'] = False
             # timescan specific
-            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRIC
+            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRICS
             self.ard_parameters['outlier_removal'] = False
 
 
@@ -538,7 +538,7 @@ class Sentinel1GRDBatch(Sentinel1):
             self.ard_parameters['datatype'] = 'float32'
             self.ard_parameters['ls_mask_apply'] = False
             # timescan specific
-            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRIC
+            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRICS
             self.ard_parameters['outlier_removal'] = True
         elif ard_type == 'OST_flat':
             self.ard_parameters['type'] = ard_type
@@ -557,7 +557,7 @@ class Sentinel1GRDBatch(Sentinel1):
             self.ard_parameters['datatype'] = 'float32'
             self.ard_parameters['ls_mask_apply'] = False
             # timescan specific
-            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRIC
+            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRICS
             self.ard_parameters['outlier_removal'] = True
         elif ard_type == 'CEOS':
             self.ard_parameters['type'] = ard_type
@@ -576,7 +576,7 @@ class Sentinel1GRDBatch(Sentinel1):
             self.ard_parameters['ls_mask_apply'] = False
             self.ard_parameters['resampling'] = SNAP_S1_RESAMPLING_METHODS[3]
             # timescan specific
-            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRIC
+            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRICS
             self.ard_parameters['outlier_removal'] = False
         elif ard_type == 'EarthEngine':
             self.ard_parameters['type'] = ard_type
@@ -595,7 +595,7 @@ class Sentinel1GRDBatch(Sentinel1):
             self.ard_parameters['datatype'] = 'float32'
             self.ard_parameters['ls_mask_apply'] = False
             # timescan specific
-            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRIC
+            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRICS
             self.ard_parameters['outlier_removal'] = False
         elif ard_type == 'Zhuo':
             self.ard_parameters['type'] = ard_type
@@ -613,7 +613,7 @@ class Sentinel1GRDBatch(Sentinel1):
             self.ard_parameters['datatype'] = 'float32'
             self.ard_parameters['ls_mask_apply'] = False
             # timescan specific
-            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRIC
+            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRICS
             self.ard_parameters['outlier_removal'] = False
 
     def grd_to_ard(self,
