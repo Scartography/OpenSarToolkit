@@ -402,22 +402,17 @@ def timeseries_to_timescan(
                         i, product[0], product[1]))
                     shutil.move(file[0], outfile)
                     list_of_files.append(outfile)
-            for file in list_of_files:
-                return_code = h.check_out_tiff(file)
-                if return_code != 0:
-                    h.remove_folder_content(opj(track_dir, 'Timescan'))
-                    return return_code
 
             # write file, so we know this ts has been succesfully processed
-            if return_code == 0:
-                check_file = opj(track_dir, 'Timescan', '.processed')
-                with open(str(check_file), 'w') as file:
-                    file.write('passed all tests \n')
+            check_file = opj(track_dir, 'Timescan', '.processed')
+            with open(str(check_file), 'w') as file:
+                file.write('passed all tests \n')
             # create vrt
             vrt_options = gdal.BuildVRTOptions(srcNodata=0, separate=True)
             gdal.BuildVRT(opj(track_dir, 'Timescan', 'Timescan.vrt'),
                           list_of_files,
-                          options=vrt_options)
+                          options=vrt_options
+                          )
 
 
 def mosaic_timeseries(inventory_df, processing_dir, temp_dir):
