@@ -66,8 +66,13 @@ def gpt_path():
                 break
 
     if gptfile is None:
-        gptfile = os.getenv('GPT_PATH')
-        os.path.isfile(gptfile)
+        try:
+            gptfile = os.getenv('GPT_PATH')
+            if gptfile is None:
+                gptfile = shutil.which('gpt')
+            os.path.isfile(gptfile)
+        except:
+            logger.debug('No GPT found in ENV Varib!')
 
     if not gptfile:
         gptfile = input('Please provide the full path to the SNAP'

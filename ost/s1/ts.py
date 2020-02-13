@@ -64,7 +64,11 @@ def create_grd_stack(
     return return_code
 
 
-def mt_speckle_filter(in_stack, out_stack, logfile):
+def mt_speckle_filter(
+        in_stack,
+        out_stack,
+        logfile
+):
     '''
     '''
 
@@ -92,7 +96,12 @@ def mt_speckle_filter(in_stack, out_stack, logfile):
     return return_code
 
 
-def mt_layover(filelist, outfile, temp_dir, extent):
+def mt_layover(
+        filelist,
+        outfile,
+        temp_dir,
+        extent
+):
     '''
     This function is usally used in the time-series workflow of OST. A list
     of the filepaths layover/shadow masks
@@ -141,7 +150,12 @@ def mt_layover(filelist, outfile, temp_dir, extent):
     return outfile
 
 
-def mt_extent(list_of_scenes, out_file, temp_dir, buffer=None):
+def mt_extent(
+        list_of_scenes,
+        out_file,
+        temp_dir,
+        buffer=None
+):
 
     out_dir = os.path.dirname(out_file)
     vrt_options = gdal.BuildVRTOptions(srcNodata=0, separate=True)
@@ -162,7 +176,6 @@ def mt_extent(list_of_scenes, out_file, temp_dir, buffer=None):
 
     os.remove(opj(out_dir, 'extent.vrt'))
     h.timer(start)
-
     return out_file
 
 
@@ -200,21 +213,24 @@ def remove_outliers(arrayin, stddev=3, z_threshold=None):
                 arrayin < masked_mean - masked_std * stddev,
                 )
             )
-
     return array_out
 
 
-def mt_metrics(stack, out_prefix, metrics, rescale_to_datatype=False,
-               to_power=False, outlier_removal=False):
+def mt_metrics(
+        stack,
+        out_prefix,
+        metrics,
+        rescale_to_datatype=False,
+        to_power=False,
+        outlier_removal=False
+):
 
     with rasterio.open(stack) as src:
         # get metadata
         meta = src.profile
-
         # update driver and reduced band count
         meta.update({'driver': 'GTiff'})
         meta.update({'count': 1})
-
         # write all different output files into a dictionary
         metric_dict = {}
         for metric in metrics:
@@ -223,12 +239,12 @@ def mt_metrics(stack, out_prefix, metrics, rescale_to_datatype=False,
 
         # scaling factors in case we have to rescale to integer
         minimums = {'avg': -30, 'max': -30, 'min': -30,
-                    'std': 0.00001, 'cov': 0.00001}
-        maximums = {'avg': 5, 'max': 5, 'min': 5, 'std': 15, 'cov': 1}
+                    'std': 0.00001, 'cov': 0.00001, 'count': 0
+                    }
+        maximums = {'avg': 5, 'max': 5, 'min': 5, 'std': 15, 'cov': 1, 'count': 9999}
 
         # loop through blocks
         for _, window in src.block_windows(1):
-
             # read array with all bands
             stack = src.read(range(1, src.count + 1), window=window)
 
@@ -238,7 +254,6 @@ def mt_metrics(stack, out_prefix, metrics, rescale_to_datatype=False,
             # transform to power
             if to_power is True:
                 stack = ras.convert_to_power(stack)
-
             # outlier removal (only applies if there are more than 5 bands)
             if outlier_removal is True and src.count >= 5:
                 stack = remove_outliers(stack)
@@ -246,35 +261,43 @@ def mt_metrics(stack, out_prefix, metrics, rescale_to_datatype=False,
             # get stats
             arr = {}
             arr['avg'] = (np.nan_to_num(np.nanmean(stack, axis=0))
-                          if 'avg'in metrics else False)
+                          if 'avg' in metrics else False
+                          )
             arr['max'] = (np.nan_to_num(np.nanmax(stack, axis=0))
-                          if 'max'in metrics else False)
+                          if 'max' in metrics else False
+                          )
             arr['min'] = (np.nan_to_num(np.nanmin(stack, axis=0))
-                          if 'min'in metrics else False)
+                          if 'min' in metrics else False
+                          )
             arr['std'] = (np.nan_to_num(np.nanstd(stack, axis=0))
-                          if 'std'in metrics else False)
-            arr['cov'] = (np.nan_to_num(stats.variation(stack, axis=0,
-                                                        nan_policy='omit'))
-                          if 'cov'in metrics else False)
+                          if 'std' in metrics else False
+                          )
+            arr['cov'] = (np.nan_to_num(
+                stats.variation(stack, axis=0, nan_policy='omit')
+            )
+                          if 'cov' in metrics else False
+                          )
+            arr['count'] = np.zeros(arr['cov'].shape)
+            arr['count'] = (np.nan_to_num(
+                np.where(stack > 0, arr['count'] + 1, arr['count'])
+            )
+                          if 'count' in metrics else False
+                          )
 
             # the metrics to be re-turned to dB, in case to_power is True
             metrics_to_convert = ['avg', 'min', 'max']
 
             # do the back conversions and write to disk loop
             for metric in metrics:
-
                 if to_power is True and metric in metrics_to_convert:
                     arr[metric] = ras.convert_to_db(arr[metric])
-
                 if rescale_to_datatype is True and meta['dtype'] != 'float32':
                     arr[metric] = ras.scale_to_int(arr[metric], meta['dtype'],
                                                    minimums[metric],
                                                    maximums[metric])
-
                 # write to dest
                 metric_dict[metric].write(
                     np.float32(arr[metric]), window=window, indexes=1)
-
     # close the output files
     for metric in metrics:
         metric_dict[metric].close()
@@ -297,19 +320,16 @@ def create_datelist(path_to_timeseries):
 
 
 def create_ts_animation(ts_dir, temp_dir, outfile, shrink_factor):
-
     for file in sorted(glob.glob(opj(ts_dir, '*VV.tif'))):
         file_index = os.path.basename(file).split('.')[0]
         date = os.path.basename(file).split('.')[1]
         file_vv = file
         file_vh = glob.glob(opj(ts_dir, '{}.*VH.tif'.format(file_index)))[0]
-
         out_temp = opj(temp_dir, '{}.jpg'.format(date))
 
         with rasterio.open(file_vv) as vv_pol:
             # get metadata
             out_meta = vv_pol.meta.copy()
-
             # !!!assure that dimensions match ####
             new_height = int(vv_pol.height/shrink_factor)
             new_width = int(vv_pol.width/shrink_factor)
@@ -360,6 +380,5 @@ def create_ts_animation(ts_dir, temp_dir, outfile, shrink_factor):
     lst_of_files = ' '.join(sorted(glob.glob(opj(temp_dir, '*jpg'))))
     cmd = 'convert -delay 200 -loop 20 {} {}'.format(lst_of_files, outfile)
     os.system(cmd)
-
     for file in glob.glob(opj(temp_dir, '*jpg')):
         os.remove(file)

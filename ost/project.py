@@ -671,11 +671,9 @@ class Sentinel1GRDBatch(Sentinel1):
                 subset,
                 self.data_mount
             )
-            
             nr_of_processed = len(
                 glob.glob(opj(self.processing_dir, '*', '20*', '.processed'))
             )
-            
             i += 1
             # not more than 5 trys
             if i == 5:
@@ -696,9 +694,9 @@ class Sentinel1GRDBatch(Sentinel1):
                                              )
                 nr_of_processed = len(
                     glob.glob(opj(self.processing_dir, '*',
-                                  'Timeseries', '.processed')))
+                                  'Timeseries', '.processed'))
+                )
                 i += 1
-            
                 # not more than 5 trys
                 if i == 5:
                     break

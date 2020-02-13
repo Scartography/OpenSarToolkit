@@ -387,23 +387,21 @@ def timeseries_to_timescan(
                     ts.mt_metrics(timeseries, timescan_prefix, metrics,
                                   rescale_to_datatype=False,
                                   to_power=to_db,
-                                  outlier_removal=outlier_removal)
+                                  outlier_removal=outlier_removal
+                                  )
 
             product_list = ['BS.HH', 'BS.VV', 'BS.HV', 'BS.VH']
             i, list_of_files = 0, []
             for product in itertools.product(product_list, metrics):
-
                 file = glob.glob(
                     opj(track_dir, 'Timescan', '*{}.{}.tif'.format(
                         product[0], product[1])))
-
                 if file:
                     i += 1
                     outfile = opj(track_dir, 'Timescan', '{}.{}.{}.tif'.format(
                         i, product[0], product[1]))
                     shutil.move(file[0], outfile)
                     list_of_files.append(outfile)
-
             for file in list_of_files:
                 return_code = h.check_out_tiff(file)
                 if return_code != 0:

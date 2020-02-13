@@ -493,8 +493,8 @@ def create_rgb_jpeg(filelist,
                      'dtype': 'uint8',
                      'count': count})
 
-    
-    if outfile:    # write array to disk
+    # write array to disk
+    if outfile:
         with rasterio.open(outfile, 'w', **out_meta) as out:
             out.write(arr.astype('uint8'))
             
@@ -510,21 +510,22 @@ def create_rgb_jpeg(filelist,
         plt.imshow(arr)
 
     
-def create_timeseries_animation(timeseries_folder,
-                                product_list,
-                                out_folder,
-                                shrink_factor=1,
-                                duration=1,
-                                add_dates=False
-                                ):
+def create_timeseries_animation(
+        timeseries_folder,
+        product_list,
+        out_folder,
+        shrink_factor=1,
+        duration=1,
+        add_dates=False
+):
 
     nr_of_products = len(glob.glob(
         opj(timeseries_folder, '*{}.tif'.format(product_list[0]))))
     outfiles = []
     # for coherence it must be one less
     if 'coh.VV' in product_list or 'coh.VH' in product_list:
-        nr_of_products == nr_of_products - 1
-        
+        nr_of_products = nr_of_products - 1
+    # Iterate over the tifs from the timeseries
     for i in range(nr_of_products):
         filelist = [glob.glob(opj(timeseries_folder, '{}.*{}*tif'.format(i + 1, product)))[0] for product in product_list]
         dates = os.path.basename(filelist[0]).split('.')[1]
@@ -553,7 +554,10 @@ def create_timeseries_animation(timeseries_folder,
                 os.remove(file + '.aux.xml')
 
 
-def np_binary_erosion(input_array, structure=np.ones((3, 3)).astype(np.bool)):
+def np_binary_erosion(
+        input_array,
+        structure=np.ones((3, 3)).astype(np.bool)
+):
     '''NumPy binary erosion function
 
     No error checking on input array (type)
