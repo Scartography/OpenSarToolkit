@@ -103,7 +103,6 @@ def _to_ard_batch(
         processing_dir,
         ard_parameters,
         subset=None,
-        data_mount='/eodata'
 ):
     # we create a processing dictionary,
     # where all frames are grouped into acquisitions
@@ -119,7 +118,7 @@ def _to_ard_batch(
 
             # check if already processed
             if os.path.isfile(opj(out_dir, '.processed')):
-                logger.debug('INFO: Acquisition from {} of track {}'
+                logger.debug('Acquisition from {} of track {}'
                              'already processed'.format(acquisition_date, track)
                              )
             else:
@@ -145,7 +144,6 @@ def ards_to_timeseries(
         processing_dir,
         ard_parameters
 ):
-    return_code = 666
     # get params
     to_db = ard_parameters['to_db']
     if to_db:
@@ -163,19 +161,19 @@ def ards_to_timeseries(
     vrt_options = gdal.BuildVRTOptions(srcNodata=0, separate=True)
 
     for track, allScenes in processing_dict.items():
-        logger.debug('INFO: Entering track {}.'.format(track))
+        logger.debug('Entering track {}.'.format(track))
         track_dir = opj(processing_dir, track)
         all_outfiles = []
 
         if os.path.isfile(opj(track_dir, 'Timeseries', '.processed')):
             logger.debug(
-                'INFO: Timeseries for track {} already processed.'.format(track)
+                'Timeseries for track {} already processed.'.format(track)
             )
         else:
-            logger.debug('INFO: Processing Timeseries for track {}.'.format(track))
+            logger.debug('Processing Timeseries for track {}.'.format(track))
             # 1) get minimum valid extent
             # (i.e. assure value fo each pixel throughout the whole time-series)
-            logger.debug('INFO: Calculating the minimum extent.')
+            logger.debug('Calculating the minimum extent.')
             list_of_scenes = glob.glob(opj(track_dir, '20*', '*data*', '*img'))
             list_of_scenes = [x for x in list_of_scenes if 'layover'not in x]
             extent = opj(track_dir, '{}.extent.shp'.format(track))
@@ -183,9 +181,9 @@ def ards_to_timeseries(
 
             # create a list of dimap files and format to comma-separated list
             list_of_ards = sorted(glob.glob(opj(track_dir, '20*', '*TC*dim')))
-            list_of_ards = '\'{}\''.format(','.join(list_of_ards))
+            string_of_ards = '\'{}\''.format(','.join(list_of_ards))
             if list_of_ards == []:
-                logger.debug('No ARDs in the AOI, skipping tack: %s!', track)
+                logger.debug('No ARDs in the AOI, skipping track: %s!', track)
                 return 'empty'
 
             if ls_mask_create:
@@ -196,12 +194,12 @@ def ards_to_timeseries(
                     '{}.ls_mask.tif'.format(track)
                 )
                 ts.mt_layover(list_of_layover, out_ls, extent=extent)
-                logger.debug('INFO: Our common layover mask is located at {}'.format(
+                logger.debug('Our common layover mask is located at {}'.format(
                     out_ls))
 
             if ls_mask_apply and ls_mask_create:
                 logger.debug(
-                    'INFO: Calculating symetrical difference of extent and ls_mask'
+                    'Calculating symetrical difference of extent and ls_mask'
                 )
                 ras.polygonize_raster(
                     out_ls,
@@ -225,19 +223,21 @@ def ards_to_timeseries(
                 )
 
                 with TemporaryDirectory() as temp:
-                    if len(list_of_pols) >= 2:
+                    if len(list_of_ards) > 1:
                         # create output stack name for RTC
                         temp_stack = opj(temp, 'stack_{}_{}'.format(track, p))
                         out_stack = opj(temp, 'mt_stack_{}_{}'.format(track, p))
-
                         # create the stack of same polarised data if polarisation exeists
                         return_code = ts.create_grd_stack(
-                            list_of_ards,
+                            string_of_ards,
                             temp_stack,
                             logfile,
                             p
                         )
                         if return_code != 0:
+                            logger.debug(
+                                'Stack build failed due to return code: %s', return_code
+                            )
                             h.remove_folder_content(temp)
                             return return_code
 
@@ -249,68 +249,77 @@ def ards_to_timeseries(
                                 temp_stack), out_stack, logfile
                             )
                             if return_code != 0:
+                                logger.debug(
+                                    'MultiTemporal spckl. filter failed due to '
+                                    'return code: %s', return_code
+                                )
                                 h.remove_folder_content(temp)
                                 return return_code
                             h.delete_dimap(temp_stack)
                         else:
                             out_stack = temp_stack
+                    else:
+                        out_stack = string_of_ards
 
-                        # get the dates of the files
-                        dates = [datetime.datetime.strptime(x.split('_')[-1][:-4], '%d%b%Y')
-                                 for x in glob.glob(opj('{}.data'.format(out_stack), '*img'))
-                                 ]
-                        # sort them
-                        dates.sort()
-                        # write them back to string for following loop
-                        sorted_dates = [
-                            datetime.datetime.strftime(ts, "%d%b%Y") for ts in dates
-                        ]
-                        i, outfiles = 1, []
-                        for date in sorted_dates:
-                            # restructure date to YYMMDD
-                            indate = datetime.datetime.strptime(date, '%d%b%Y')
-                            outdate = datetime.datetime.strftime(indate, '%y%m%d')
-                            infile = glob.glob(
-                                opj('{}.data'.format(out_stack),
-                                    '*{}*{}*img'.format(p, date)
-                                    )
-                            )[0]
-                            # create outFile
-                            outfile = opj(
-                                track_dir,
-                                'Timeseries',
-                                '{}.{}.BS.{}.tif'.format(i, outdate, p)
-                            )
-                            # mask by extent
-                            ras.mask_by_shape(
-                                infile, outfile,
-                                extent,
-                                to_db=to_db_mt,
-                                datatype=datatype,
-                                min_value=-30, max_value=5,
-                                ndv=0
-                            )
-                            # add ot a list for subsequent vrt creation
-                            outfiles.append(outfile)
-                            all_outfiles.append(outfile)
-
-                            i += 1
-
-                        # build vrt of timeseries
-                        gdal.BuildVRT(opj(
+                    # get the dates of the files
+                    dates = [datetime.datetime.strptime(x.split('_')[-1][:-4], '%d%b%Y')
+                             for x in glob.glob(opj('{}.data'.format(out_stack), '*img'))
+                             ]
+                    # sort them
+                    dates.sort()
+                    # write them back to string for following loop
+                    sorted_dates = [
+                        datetime.datetime.strftime(ts, "%d%b%Y") for ts in dates
+                    ]
+                    i, outfiles = 1, []
+                    for date in sorted_dates:
+                        # restructure date to YYMMDD
+                        indate = datetime.datetime.strptime(date, '%d%b%Y')
+                        outdate = datetime.datetime.strftime(indate, '%y%m%d')
+                        infile = glob.glob(
+                            opj('{}.data'.format(out_stack),
+                                '*{}*{}*img'.format(p, date)
+                                )
+                        )[0]
+                        # create outFile
+                        outfile = opj(
                             track_dir,
                             'Timeseries',
-                            'BS.Timeseries.{}.vrt'.format(p)),
-                            outfiles,
-                            options=vrt_options
+                            '{}.{}.BS.{}.tif'.format(i, outdate, p)
                         )
-                        # delete stack as it is not nessesary anymore, tifs in place
-                        h.delete_dimap(out_stack)
+                        # mask by extent
+                        ras.mask_by_shape(
+                            infile, outfile,
+                            extent,
+                            to_db=to_db_mt,
+                            datatype=datatype,
+                            min_value=-30, max_value=5,
+                            ndv=0
+                        )
+                        # add ot a list for subsequent vrt creation
+                        outfiles.append(outfile)
+                        all_outfiles.append(outfile)
+
+                        i += 1
+
+                    # build vrt of timeseries
+                    gdal.BuildVRT(opj(
+                        track_dir,
+                        'Timeseries',
+                        'BS.Timeseries.{}.vrt'.format(p)),
+                        outfiles,
+                        options=vrt_options
+                    )
+                    # delete stack as it is not nessesary anymore, tifs in place
+                    h.delete_dimap(out_stack)
 
             # write file, so we know this ts has been succesfully processed
             check_file = opj(track_dir, 'Timeseries', '.processed')
             with open(str(check_file), 'w') as file:
                 file.write('passed all tests \n')
+            logger.debug(
+                'Timeseries for track {} has been processed.'.format(track)
+            )
 
 
 def timeseries_to_timescan(
@@ -332,13 +341,13 @@ def timeseries_to_timescan(
     # loop through tracks
     for track, allScenes in processing_dict.items():
 
-        logger.debug('INFO: Entering track {}.'.format(track))
+        logger.debug('Entering track {}.'.format(track))
         # get track directory
         track_dir = opj(processing_dir, track)
         if os.path.isfile(opj(track_dir, 'Timescan', '.processed')):
-            logger.debug('INFO: Timescans for track {} already processed.'.format(track))
+            logger.debug('Timescans for track {} already processed.'.format(track))
         else:
-            logger.debug('INFO: Processing Timescans for track {}.'.format(track))
+            logger.debug('Processing Timescans for track {}.'.format(track))
             # define and create Timescan directory
             timescan_dir = opj(track_dir, 'Timescan')
             os.makedirs(timescan_dir, exist_ok=True)
@@ -386,10 +395,13 @@ def timeseries_to_timescan(
                           list_of_files,
                           options=vrt_options
                           )
+            logger.debug(
+                'Timescan for track {} has been processed.'.format(track)
+            )
 
 
 def mosaic_timeseries(inventory_df, processing_dir):
-    logger.debug('INFO: Mosaicking Time-series layers')
+    logger.debug('Mosaicking Time-series layers')
     for p in ['VV', 'VH', 'HH', 'HV']:
         processing_dict = _create_processing_dict(inventory_df)
         keys = [x for x in processing_dict.keys()]
@@ -453,13 +465,13 @@ def mosaic_timeseries(inventory_df, processing_dir):
 
                 if os.path.isfile(check_file):
                     logger.debug(
-                        'INFO: Mosaic layer {} already processed.'.format(
+                        'Mosaic layer {} already processed.'.format(
                             os.path.basename(outfile)
                         )
                     )
                 else:
                     logger.debug(
-                        'INFO: Mosaicking layer {}.'.format(
+                        'Mosaicking layer {}.'.format(
                             os.path.basename(outfile)
                         )
                     )
@@ -494,7 +506,7 @@ def mosaic_timescan(
         processing_dir,
         ard_parameters
 ):
-    logger.debug('INFO: Mosaicking Timescan layers')
+    logger.debug('Mosaicking Timescan layers')
     metrics = ard_parameters['metrics']
     outfiles = []
     for p in ['VV', 'VH', 'HH', 'HV']:
@@ -534,13 +546,13 @@ def mosaic_timescan(
 
                 if os.path.isfile(check_file):
                     logger.debug(
-                        'INFO: Mosaic layer {} already processed.'.format(
+                        'Mosaic layer {} already processed.'.format(
                             os.path.basename(outfile)
                         )
                     )
                 else:
                     logger.debug(
-                        'INFO: Mosaicking layer {}.'.format(
+                        'Mosaicking layer {}.'.format(
                             os.path.basename(outfile)
                         )
                     )

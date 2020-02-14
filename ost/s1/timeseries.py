@@ -180,14 +180,12 @@ def mt_extent(
 
 
 def remove_outliers(arrayin, stddev=3, z_threshold=None):
-
     if z_threshold:
         z_score = np.abs(stats.zscore(arrayin))
         array_out = np.ma.MaskedArray(
             arrayin,
             mask=z_score > z_threshold)
     else:
-
         # calculate percentiles
         perc95 = np.percentile(arrayin, 95, axis=0)
         perc5 = np.percentile(arrayin, 5, axis=0)
@@ -200,7 +198,6 @@ def remove_outliers(arrayin, stddev=3, z_threshold=None):
                 arrayin < perc5
                 )
             )
-
         # we calculate new std and mean
         masked_std = np.std(masked_array, axis=0)
         masked_mean = np.mean(masked_array, axis=0)
