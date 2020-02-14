@@ -293,16 +293,16 @@ def ards_to_timeseries(
 
                             i += 1
 
-        # build vrt of timeseries
-        gdal.BuildVRT(opj(
-            track_dir,
-            'Timeseries',
-            'BS.Timeseries.{}.vrt'.format(p)),
-            outfiles,
-            options=vrt_options
-        )
-        # if os.path.isdir('{}.data'.format(out_stack)):
-        h.delete_dimap(out_stack)
+            # build vrt of timeseries
+            gdal.BuildVRT(opj(
+                track_dir,
+                'Timeseries',
+                'BS.Timeseries.{}.vrt'.format(p)),
+                outfiles,
+                options=vrt_options
+            )
+            # if os.path.isdir('{}.data'.format(out_stack)):
+            h.delete_dimap(out_stack)
 
             # write file, so we know this ts has been succesfully processed
             check_file = opj(track_dir, 'Timeseries', '.processed')
