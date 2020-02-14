@@ -6,6 +6,7 @@ import glob
 import time
 import logging
 from datetime import datetime
+from tempfile import TemporaryDirectory
 
 import gdal
 import rasterio
@@ -99,7 +100,6 @@ def mt_speckle_filter(
 def mt_layover(
         filelist,
         outfile,
-        temp_dir,
         extent
 ):
     '''
@@ -113,50 +113,50 @@ def mt_layover(
 
     # get the start time for Info on processing time
     start = time.time()
-    # create path to out file
-    ls_layer = opj(temp_dir, os.path.basename(outfile))
 
-    # create a vrt-stack out of
-    logger.debug('INFO: Creating common Layover/Shadow Mask')
-    vrt_options = gdal.BuildVRTOptions(srcNodata=0, separate=True)
-    gdal.BuildVRT(opj(temp_dir, 'ls.vrt'), filelist, options=vrt_options)
+    with TemporaryDirectory() as temp:
+        # create path to out file
+        ls_layer = opj(temp, os.path.basename(outfile))
 
-    with rasterio.open(opj(temp_dir, 'ls.vrt')) as src:
+        # create a vrt-stack out of
+        logger.debug('INFO: Creating common Layover/Shadow Mask')
+        vrt_options = gdal.BuildVRTOptions(srcNodata=0, separate=True)
+        gdal.BuildVRT(opj(temp, 'ls.vrt'), filelist, options=vrt_options)
 
-        # get metadata
-        meta = src.meta
-        # update driver and reduced band count
-        meta.update(driver='GTiff', count=1, dtype='uint8')
+        with rasterio.open(opj(temp, 'ls.vrt')) as src:
 
-        # create outfiles
-        with rasterio.open(ls_layer, 'w', **meta) as out_min:
+            # get metadata
+            meta = src.meta
+            # update driver and reduced band count
+            meta.update(driver='GTiff', count=1, dtype='uint8')
 
-            # loop through blocks
-            for _, window in src.block_windows(1):
+            # create outfiles
+            with rasterio.open(ls_layer, 'w', **meta) as out_min:
 
-                # read array with all bands
-                stack = src.read(range(1, src.count + 1), window=window)
+                # loop through blocks
+                for _, window in src.block_windows(1):
 
-                # get stats
-                arr_max = np.nanmax(stack, axis=0)
-                arr = arr_max / arr_max
+                    # read array with all bands
+                    stack = src.read(range(1, src.count + 1), window=window)
 
-                out_min.write(np.uint8(arr), window=window, indexes=1)
+                    # get stats
+                    arr_max = np.nanmax(stack, axis=0)
+                    arr = arr_max / arr_max
 
-    ras.mask_by_shape(ls_layer, outfile, extent, to_db=False,
-                      datatype='uint8', rescale=False, ndv=0)
-    # os.remove(ls_layer)
-    h.timer(start)
+                    out_min.write(np.uint8(arr), window=window, indexes=1)
+
+        ras.mask_by_shape(ls_layer, outfile, extent, to_db=False,
+                          datatype='uint8', rescale=False, ndv=0)
+        # os.remove(ls_layer)
+        h.timer(start)
     return outfile
 
 
 def mt_extent(
         list_of_scenes,
         out_file,
-        temp_dir,
         buffer=None
 ):
-
     out_dir = os.path.dirname(out_file)
     vrt_options = gdal.BuildVRTOptions(srcNodata=0, separate=True)
 
@@ -167,15 +167,15 @@ def mt_extent(
 
     logger.debug('INFO: Creating shapefile of common extent.')
     start = time.time()
+    with TemporaryDirectory as temp:
+        outline_file = opj(temp, os.path.basename(out_file))
+        ras.outline(opj(out_dir, 'extent.vrt'), outline_file, 0, False)
 
-    outline_file = opj(temp_dir, os.path.basename(out_file))
-    ras.outline(opj(out_dir, 'extent.vrt'), outline_file, 0, False)
+        vec.exterior(outline_file, out_file, buffer)
+        h.delete_shapefile(outline_file)
 
-    vec.exterior(outline_file, out_file, buffer)
-    h.delete_shapefile(outline_file)
-
-    os.remove(opj(out_dir, 'extent.vrt'))
-    h.timer(start)
+        os.remove(opj(out_dir, 'extent.vrt'))
+        h.timer(start)
     return out_file
 
 
@@ -322,7 +322,6 @@ def create_datelist(path_to_timeseries):
 
 def create_ts_animation(
         ts_dir,
-        temp_dir,
         outfile,
         shrink_factor
 ):
@@ -331,63 +330,63 @@ def create_ts_animation(
         date = os.path.basename(file).split('.')[1]
         file_vv = file
         file_vh = glob.glob(opj(ts_dir, '{}.*VH.tif'.format(file_index)))[0]
-        out_temp = opj(temp_dir, '{}.jpg'.format(date))
+        with TemporaryDirectory() as temp:
+            out_temp = opj(temp, '{}.jpg'.format(date))
+            with rasterio.open(file_vv) as vv_pol:
+                # get metadata
+                out_meta = vv_pol.meta.copy()
+                # !!!assure that dimensions match ####
+                new_height = int(vv_pol.height/shrink_factor)
+                new_width = int(vv_pol.width/shrink_factor)
+                out_shape = (vv_pol.count, new_height, new_width)
 
-        with rasterio.open(file_vv) as vv_pol:
-            # get metadata
-            out_meta = vv_pol.meta.copy()
-            # !!!assure that dimensions match ####
-            new_height = int(vv_pol.height/shrink_factor)
-            new_width = int(vv_pol.width/shrink_factor)
-            out_shape = (vv_pol.count, new_height, new_width)
+                out_meta.update(height=new_height, width=new_width)
 
-            out_meta.update(height=new_height, width=new_width)
+                # create empty array
+                arr = np.zeros((int(out_meta['height']),
+                                int(out_meta['width']),
+                                int(3)))
+                # read vv array
+                arr[:, :, 0] = vv_pol.read(out_shape=out_shape, resampling=5)
 
-            # create empty array
-            arr = np.zeros((int(out_meta['height']),
-                            int(out_meta['width']),
-                            int(3)))
-            # read vv array
-            arr[:, :, 0] = vv_pol.read(out_shape=out_shape, resampling=5)
+            with rasterio.open(file_vh) as vh_pol:
+                # read vh array
+                arr[:, :, 1] = vh_pol.read(out_shape=out_shape, resampling=5)
 
-        with rasterio.open(file_vh) as vh_pol:
-            # read vh array
-            arr[:, :, 1] = vh_pol.read(out_shape=out_shape, resampling=5)
+            # create ratio
+            arr[:, :, 2] = np.subtract(arr[:, :, 0], arr[:, :, 1])
 
-        # create ratio
-        arr[:, :, 2] = np.subtract(arr[:, :, 0], arr[:, :, 1])
+            # rescale_to_datatype to uint8
+            arr[:, :, 0] = ras.scale_to_int(arr[:, :, 0], -20., 0., 'uint8')
+            arr[:, :, 1] = ras.scale_to_int(arr[:, :, 1], -25., -5., 'uint8')
+            arr[:, :, 2] = ras.scale_to_int(arr[:, :, 2], 1., 15., 'uint8')
 
-        # rescale_to_datatype to uint8
-        arr[:, :, 0] = ras.scale_to_int(arr[:, :, 0], -20., 0., 'uint8')
-        arr[:, :, 1] = ras.scale_to_int(arr[:, :, 1], -25., -5., 'uint8')
-        arr[:, :, 2] = ras.scale_to_int(arr[:, :, 2], 1., 15., 'uint8')
+            # update outfile's metadata
+            out_meta.update({'driver': 'JPEG',
+                             'dtype': 'uint8',
+                             'count': 3})
 
-        # update outfile's metadata
-        out_meta.update({'driver': 'JPEG',
-                         'dtype': 'uint8',
-                         'count': 3})
+            # transpose array to gdal format
+            arr = np.transpose(arr, [2, 0, 1])
 
-        # transpose array to gdal format
-        arr = np.transpose(arr, [2, 0, 1])
+            # write array to disk
+            with rasterio.open(out_temp, 'w', **out_meta) as out:
+                out.write(arr.astype('uint8'))
 
-        # write array to disk
-        with rasterio.open(out_temp, 'w', **out_meta) as out:
-            out.write(arr.astype('uint8'))
+            # add date
+            label_height = np.floor(np.divide(int(out_meta['height']), 15))
+            cmd = 'convert -background \'#0008\' -fill white -gravity center \
+                  -size {}x{} caption:\"{}\" {} +swap -gravity north \
+                  -composite {}'.format(out_meta['width'],
+                                        label_height,
+                                        date, out_temp,
+                                        out_temp
+                                        )
+            os.system(cmd)
 
-        # add date
-        label_height = np.floor(np.divide(int(out_meta['height']), 15))
-        cmd = 'convert -background \'#0008\' -fill white -gravity center \
-              -size {}x{} caption:\"{}\" {} +swap -gravity north \
-              -composite {}'.format(out_meta['width'],
-                                    label_height,
-                                    date, out_temp,
-                                    out_temp
-                                    )
+        # create gif
+        lst_of_files = ' '.join(sorted(glob.glob(opj(temp, '*jpg'))))
+        cmd = 'convert -delay 200 -loop 20 {} {}'.format(lst_of_files, outfile)
         os.system(cmd)
-
-    # create gif
-    lst_of_files = ' '.join(sorted(glob.glob(opj(temp_dir, '*jpg'))))
-    cmd = 'convert -delay 200 -loop 20 {} {}'.format(lst_of_files, outfile)
-    os.system(cmd)
-    for file in glob.glob(opj(temp_dir, '*jpg')):
-        os.remove(file)
+        for file in glob.glob(opj(temp, '*jpg')):
+            os.remove(file)

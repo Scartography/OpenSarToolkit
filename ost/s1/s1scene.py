@@ -11,6 +11,7 @@ import zipfile
 import fnmatch
 import xml.dom.minidom
 import xml.etree.ElementTree as ET
+from tempfile import TemporaryDirectory
 
 import numpy as np
 import pandas as pd
@@ -237,16 +238,6 @@ class Sentinel1Scene:
             # (i.e. the xml coming back from scihub)
             response = req.read().decode('utf-8')
             uuid = response.split("Products('")[1].split("')")[0]
-
-            # parse the xml page from the response
-            # dom = xml.dom.minidom.parseString(response)
-
-            # loop thorugh each entry (with all metadata)
-#            for node in dom.getElementsByTagName('entry'):
-#                download_url = node.getElementsByTagName(
-#                    'id')[0].firstChild.nodeValue
-#                uuid = download_url.split('(\'')[1].split('\')')[0]
-
         return uuid
 
     def scihub_url(self, opener):
@@ -667,8 +658,16 @@ class Sentinel1Scene:
             self.ard_parameters['dem'] = 'SRTM 1Sec HGT'
             self.ard_parameters['resampling'] = SNAP_S1_RESAMPLING_METHODS[2]
 
-    def create_ard(self, infile, out_dir, out_prefix, temp_dir,
-                   subset=None, polar='VV,VH,HH,HV', max_workers=int(os.cpu_count()/2)):
+    def create_ard(
+            self,
+            filelist,
+            out_dir,
+            out_prefix,
+            temp_dir=os.getcwd(),
+            subset=None,
+            polar='VV,VH,HH,HV',
+            max_workers=int(os.cpu_count()/2)
+    ):
         out_paths = []
         if subset is not None:
             p_poly = loads(subset)
@@ -677,7 +676,7 @@ class Sentinel1Scene:
         else:
             self.processing_poly = None
             try:
-                self.center_lat = self._get_center_lat(infile)
+                self.center_lat = self._get_center_lat(filelist)
             except Exception as e:
                 raise
         if float(self.center_lat) > 59 or float(self.center_lat) < -59:
@@ -685,67 +684,57 @@ class Sentinel1Scene:
                          ' DEM instead.'
                          )
             self.ard_parameters['dem'] = 'ASTER 1sec GDEM'
+
+        if not self.ard_parameters:
+            logger.debug('INFO: No ARD definition given.'
+                         ' Using the OST standard ARD defintion'
+                         ' Use object.set_ard_defintion() first if you want to'
+                         ' change the ARD defintion.'
+                         )
+            self.set_ard_parameters('OST')
         if self.product_type == 'GRD':
-            if not self.ard_parameters:
-                logger.debug('INFO: No ARD definition given.'
-                             ' Using the OST standard ARD defintion'
-                             ' Use object.set_ard_defintion() first if you want to'
-                             ' change the ARD defintion.'
-                             )
-                self.set_ard_parameters('OST')
             if self.ard_parameters['resampling'] not in SNAP_S1_RESAMPLING_METHODS:
                 self.ard_parameters['resampling'] = 'BILINEAR_INTERPOLATION'
                 logger.debug('WARNING: Invalid resampling method '
                              'using BILINEAR_INTERPOLATION'
                              )
-
-            # we need to convert the infile t a list for the grd_to_ard routine
-            infile = [infile]
             out_prefix = out_prefix.replace(' ', '_')
-            # run the processing
-            return_code = grd_to_ard(
-                infile,
-                out_dir,
-                out_prefix,
-                temp_dir,
-                self.ard_parameters['resolution'],
-                self.ard_parameters['resampling'],
-                self.ard_parameters['product_type'],
-                self.ard_parameters['ls_mask_create'],
-                self.ard_parameters['speckle_filter'],
-                self.ard_parameters['dem'],
-                self.ard_parameters['to_db'],
-                self.ard_parameters['border_noise'],
-                subset=subset,
-                polarisation=polar
-            )
-            if return_code != 0:
-                raise RuntimeError(
-                    'Something went wrong with the GPT processing! '
-                    'with return code: %s' % return_code
+            with TemporaryDirectory(dir=temp_dir) as temp:
+                # run the processing
+                return_code = grd_to_ard(
+                    filelist,
+                    out_dir,
+                    out_prefix,
+                    temp,
+                    self.ard_parameters['resolution'],
+                    self.ard_parameters['resampling'],
+                    self.ard_parameters['product_type'],
+                    self.ard_parameters['ls_mask_create'],
+                    self.ard_parameters['speckle_filter'],
+                    self.ard_parameters['dem'],
+                    self.ard_parameters['to_db'],
+                    self.ard_parameters['border_noise'],
+                    subset=subset,
+                    polarisation=polar
                 )
-            # write to class attribute
-            self.ard_dimap = glob.glob(opj(out_dir, '{}*TC.dim'
-                                           .format(out_prefix)))[0]
-            if not os.path.isfile(self.ard_dimap):
-                raise RuntimeError
-            out_paths.append(self.ard_dimap)
+                if return_code != 0:
+                    raise RuntimeError(
+                        'Something went wrong with the GPT processing! '
+                        'with return code: %s' % return_code
+                    )
+                # write to class attribute
+                self.ard_dimap = glob.glob(opj(out_dir, '{}*TC.dim'
+                                               .format(out_prefix)))[0]
+                if not os.path.isfile(self.ard_dimap):
+                    raise RuntimeError
+                out_paths.append(self.ard_dimap)
 
         elif self.product_type == 'SLC':
-            # TODO align ARD types with GRD
             """
             Works for only one product at a time, all products are handled as 
             master products in this condition, returning an ARD with 
             the provided ARD parameters!
             """
-            if not self.ard_parameters:
-                logger.debug('INFO: No ARD definition given.'
-                             ' Using the OST standard ARD defintion'
-                             ' Use object.set_ard_defintion() first if you want to'
-                             ' change the ARD defintion.'
-                             )
-                self.set_ard_parameters('GTCgamma')
-                self.ard_parameters['type'] = 'GTCgamma'
             if self.ard_parameters['resampling'] not in SNAP_S1_RESAMPLING_METHODS:
                 self.ard_parameters['resampling'] = 'BILINEAR_INTERPOLATION'
                 logger.debug('WARNING: Invalid resampling method '
@@ -770,39 +759,40 @@ class Sentinel1Scene:
             )
             exception_flag = True
             exception_counter = 0
-            while exception_flag is True:
-                executor_type = 'concurrent_processes'
-                executor = Executor(executor=executor_type, max_workers=max_workers)
-                if exception_counter > 3 or exception_flag is False:
-                    break
-                for swath, b in bursts_dict.items():
-                    if b != []:
-                        try:
-                            for task in executor.as_completed(
-                                    func=execute_ard,
-                                    iterable=b,
-                                    fargs=(swath,
-                                           master_file,
-                                           out_dir,
-                                           out_prefix,
-                                           temp_dir,
-                                           self.ard_parameters
-                                           )
+            with TemporaryDirectory(dir=temp_dir) as temp:
+                while exception_flag is True:
+                    executor_type = 'concurrent_processes'
+                    executor = Executor(executor=executor_type, max_workers=max_workers)
+                    if exception_counter > 3 or exception_flag is False:
+                        break
+                    for swath, b in bursts_dict.items():
+                        if b != []:
+                            try:
+                                for task in executor.as_completed(
+                                        func=execute_ard,
+                                        iterable=b,
+                                        fargs=(swath,
+                                               master_file,
+                                               out_dir,
+                                               out_prefix,
+                                               temp,
+                                               self.ard_parameters
+                                               )
 
-                            ):
-                                return_code, out_file = task.result()
-                                out_paths.append(out_file)
-                        except Exception as e:
-                            logger.debug(e)
-                            max_workers = int(max_workers/2)
-                            exception_flag = True
-                            exception_counter += 1
+                                ):
+                                    return_code, out_file = task.result()
+                                    out_paths.append(out_file)
+                            except Exception as e:
+                                logger.debug(e)
+                                max_workers = int(max_workers/2)
+                                exception_flag = True
+                                exception_counter += 1
+                            else:
+                                exception_flag = False
                         else:
                             exception_flag = False
-                    else:
-                        exception_flag = False
-                        continue
-            self.ard_dimap = out_paths
+                            continue
+                self.ard_dimap = out_paths
         else:
             raise RuntimeError('ERROR: create_ard needs S1 SLC or GRD')
         return out_paths

@@ -923,7 +923,7 @@ def grd_to_ard(filelist,
         return return_code
 
     data_dir = glob.glob(opj(temp_dir, '{}*imported.data'.format(out_prefix)))
-    if isinstance(data_dir , list):
+    if isinstance(data_dir, list):
         for d in data_dir:
             if d != [] and os.path.isdir(d):
                 h.delete_dimap(str(d)[:-5])

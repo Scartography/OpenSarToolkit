@@ -1,5 +1,4 @@
 import os
-import shutil
 import sys
 import glob
 import logging
@@ -30,8 +29,7 @@ class Generic():
                  data_mount=None,
                  download_dir=None,
                  inventory_dir=None,
-                 processing_dir=None,
-                 temp_dir=None
+                 processing_dir=None
                  ):
         self.project_dir = os.path.abspath(project_dir)
         self.start = start
@@ -40,7 +38,6 @@ class Generic():
         self.download_dir = download_dir
         self.inventory_dir = inventory_dir
         self.processing_dir = processing_dir
-        self.temp_dir = temp_dir
 
         # handle the import of different aoi formats and transform
         # to a WKT string
@@ -73,14 +70,11 @@ class Generic():
             self.inventory_dir = opj(project_dir, 'inventory')
         if not self.processing_dir:
             self.processing_dir = opj(project_dir, 'processing')
-        if not self.temp_dir:
-            self.temp_dir = opj(project_dir, 'temp')
 
         self._create_project_dir()
         self._create_download_dir(self.download_dir)
         self._create_inventory_dir(self.inventory_dir)
         self._create_processing_dir(self.processing_dir)
-        self._create_temp_dir(self.temp_dir)
 
     def _create_project_dir(self, if_not_empty=True):
         '''Creates the high-lvel project directory
@@ -156,23 +150,6 @@ class Generic():
         logging.info('Inventory files will be stored in: {}'
                      .format(self.inventory_dir))
 
-    def _create_temp_dir(self, temp_dir=None):
-        '''Creates the high-level temporary directory
-
-        :param instance attribute temp_dir or
-               default value (i.e. /path/to/project_dir/temp)
-
-        :return None
-        '''
-        if temp_dir is None:
-            self.temp_dir = opj(self.project_dir, 'temp')
-        else:
-            self.temp_dir = temp_dir
-
-        os.makedirs(self.temp_dir, exist_ok=True)
-        logging.info('Using {} as  directory for temporary files.'
-                     .format(self.temp_dir))
-
 
 class Sentinel1(Generic):
     '''A Sentinel-1 specific subclass of the Generic OST class
@@ -190,14 +167,13 @@ class Sentinel1(Generic):
                  download_dir=None,
                  inventory_dir=None,
                  processing_dir=None,
-                 temp_dir=None,
                  product_type='*',
                  beam_mode='*',
                  polarisation='*'
                  ):
 
         super().__init__(project_dir, aoi, start, end, data_mount,
-                         download_dir, inventory_dir, processing_dir, temp_dir
+                         download_dir, inventory_dir, processing_dir
                          )
 
         self.product_type = product_type
@@ -371,7 +347,6 @@ class Sentinel1Batch(Sentinel1):
                  download_dir=None,
                  inventory_dir=None,
                  processing_dir=None,
-                 temp_dir=None,
                  product_type='SLC',
                  beam_mode='IW',
                  polarisation='*',
@@ -381,8 +356,7 @@ class Sentinel1Batch(Sentinel1):
 
         super().__init__(project_dir, aoi, start, end, data_mount, mirror,
                          metadata_concurency, download_dir, inventory_dir,
-                         processing_dir, temp_dir, product_type, beam_mode,
-                         polarisation
+                         processing_dir, product_type, beam_mode, polarisation
                          )
 
         self.ard_type = ard_type
@@ -391,7 +365,7 @@ class Sentinel1Batch(Sentinel1):
 
     # processing related functions
 
-    def _to_ard(self, subset=None, overwrite=False):
+    def to_ard(self, subset=None, overwrite=False):
         if overwrite:
             logger.debug('INFO: Deleting processing folder to start from scratch')
             h.remove_folder_content(self.processing_dir)
@@ -435,7 +409,6 @@ class Sentinel1Batch(Sentinel1):
                 self.inventory,
                 self.download_dir,
                 self.processing_dir,
-                self.temp_dir,
                 self.ard_parameters,
                 subset,
                 self.data_mount
@@ -458,7 +431,6 @@ class Sentinel1Batch(Sentinel1):
         while len(self.inventory.relativeorbit.unique()) > nr_of_processed:
             batch.ards_to_timeseries(self.inventory,
                                      self.processing_dir,
-                                     self.temp_dir,
                                      self.ard_parameters
                                      )
             nr_of_processed = len(
@@ -496,13 +468,11 @@ class Sentinel1Batch(Sentinel1):
             batch.mosaic_timeseries(
                 self.inventory,
                 self.processing_dir,
-                self.temp_dir
             )
         else:
             batch.mosaic_timeseries(
                 self.inventory,
                 self.processing_dir,
-                self.temp_dir
             )
 
     def create_burst_inventory(self,

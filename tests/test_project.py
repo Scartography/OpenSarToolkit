@@ -14,7 +14,6 @@ logger = logging.getLogger(__name__)
 def test_sentinel_generic_class(some_bounds):
     with TemporaryDirectory(dir=os.getcwd()) as temp, \
             TemporaryDirectory(dir=os.getcwd()) as dl_temp, \
-            TemporaryDirectory(dir=os.getcwd()) as tmp_temp, \
             TemporaryDirectory(dir=os.getcwd()) as inv_temp:
 
         sen1 = Sen1(
@@ -27,7 +26,6 @@ def test_sentinel_generic_class(some_bounds):
              mirror=2,
              inventory_dir=inv_temp,
              processing_dir=temp,
-             temp_dir=tmp_temp,
              product_type='GRD',
              beam_mode='IW',
              polarisation='VV,VH'
@@ -63,7 +61,6 @@ def test_sentinel1_grd_batch(some_bounds):
             mirror=2,
             inventory_dir=inv_temp,
             processing_dir=temp,
-            temp_dir=tmp_temp,
             product_type='GRD',
             beam_mode='IW',
             polarisation='VV,VH',
@@ -80,7 +77,7 @@ def test_sentinel1_grd_batch(some_bounds):
                       uname=HERBERT_USER['uname'],
                       pword=HERBERT_USER['asf_pword']
                       )
-        sen1._to_ard(
+        sen1.to_ard(
             subset=box(
                 some_bounds[0], some_bounds[1], some_bounds[2], some_bounds[3]
             ).wkt,
@@ -94,7 +91,6 @@ def test_sentinel1_grd_batch(some_bounds):
 def test_sentinel_generic_downlaod(some_bounds):
     with TemporaryDirectory() as temp, \
             TemporaryDirectory() as dl_temp, \
-            TemporaryDirectory() as tmp_temp, \
             TemporaryDirectory() as inv_temp:
 
         sen1 = Sen1(
@@ -107,7 +103,6 @@ def test_sentinel_generic_downlaod(some_bounds):
             mirror=2,
             inventory_dir=inv_temp,
             processing_dir=temp,
-            temp_dir=tmp_temp,
             product_type='GRD',
             beam_mode='IW',
             polarisation='VV,VH'
