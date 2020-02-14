@@ -184,6 +184,9 @@ def ards_to_timeseries(
             # create a list of dimap files and format to comma-separated list
             list_of_ards = sorted(glob.glob(opj(track_dir, '20*', '*TC*dim')))
             list_of_ards = '\'{}\''.format(','.join(list_of_ards))
+            if list_of_ards == []:
+                logger.debug('No ARDs in the AOI, skipping tack: %s!', track)
+                return 'empty'
 
             if ls_mask_create:
                 list_of_scenes = glob.glob(opj(track_dir, '20*', '*data*', '*img'))
@@ -213,18 +216,19 @@ def ards_to_timeseries(
                 list_of_pols = sorted(
                     glob.glob(opj(track_dir, '20*', '*TC*data', '*{}*.img'.format(p)))
                 )
+
+                os.makedirs(opj(track_dir, 'Timeseries'), exist_ok=True)
+                logfile = opj(
+                    track_dir,
+                    'Timeseries',
+                    '{}.stack.errLog'.format(p)
+                )
+
                 with TemporaryDirectory() as temp:
                     if len(list_of_pols) >= 2:
                         # create output stack name for RTC
                         temp_stack = opj(temp, 'stack_{}_{}'.format(track, p))
                         out_stack = opj(temp, 'mt_stack_{}_{}'.format(track, p))
-
-                        os.makedirs(opj(track_dir, 'Timeseries'), exist_ok=True)
-                        logfile = opj(
-                            track_dir,
-                            'Timeseries',
-                            '{}.stack.errLog'.format(p)
-                        )
 
                         # create the stack of same polarised data if polarisation exeists
                         return_code = ts.create_grd_stack(
@@ -248,7 +252,6 @@ def ards_to_timeseries(
                                 h.remove_folder_content(temp)
                                 return return_code
                             h.delete_dimap(temp_stack)
-
                         else:
                             out_stack = temp_stack
 
@@ -293,16 +296,16 @@ def ards_to_timeseries(
 
                             i += 1
 
-            # build vrt of timeseries
-            gdal.BuildVRT(opj(
-                track_dir,
-                'Timeseries',
-                'BS.Timeseries.{}.vrt'.format(p)),
-                outfiles,
-                options=vrt_options
-            )
-            # if os.path.isdir('{}.data'.format(out_stack)):
-            h.delete_dimap(out_stack)
+                        # build vrt of timeseries
+                        gdal.BuildVRT(opj(
+                            track_dir,
+                            'Timeseries',
+                            'BS.Timeseries.{}.vrt'.format(p)),
+                            outfiles,
+                            options=vrt_options
+                        )
+                        # delete stack as it is not nessesary anymore, tifs in place
+                        h.delete_dimap(out_stack)
 
             # write file, so we know this ts has been succesfully processed
             check_file = opj(track_dir, 'Timeseries', '.processed')
