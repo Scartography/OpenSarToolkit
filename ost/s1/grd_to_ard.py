@@ -767,7 +767,6 @@ def _grd_ls_mask(
                 See {} for Snap Error output'.format(logfile))
         raise RuntimeError
         sys.exit(112)
-
     return return_code
 
 

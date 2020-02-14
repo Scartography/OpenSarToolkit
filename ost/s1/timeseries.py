@@ -247,7 +247,6 @@ def mt_metrics(
         for _, window in src.block_windows(1):
             # read array with all bands
             stack = src.read(range(1, src.count + 1), window=window)
-
             if rescale_to_datatype is True and meta['dtype'] != 'float32':
                 stack = ras.rescale_to_float(stack, meta['dtype'])
 
@@ -314,11 +313,19 @@ def create_datelist(path_to_timeseries):
 
     with open('{}/datelist.txt'.format(path_to_timeseries), 'w') as file:
         for date in dates:
-            file.write(str(datetime.strftime(datetime.strptime(
-                date, '%y%m%d'), '%Y-%m-%d')) + '\n')
+            file.write(
+                str(
+                    datetime.strftime(datetime.strptime(date, '%y%m%d'), '%Y-%m-%d')
+                ) + '\n'
+            )
 
 
-def create_ts_animation(ts_dir, temp_dir, outfile, shrink_factor):
+def create_ts_animation(
+        ts_dir,
+        temp_dir,
+        outfile,
+        shrink_factor
+):
     for file in sorted(glob.glob(opj(ts_dir, '*VV.tif'))):
         file_index = os.path.basename(file).split('.')[0]
         date = os.path.basename(file).split('.')[1]
@@ -371,8 +378,11 @@ def create_ts_animation(ts_dir, temp_dir, outfile, shrink_factor):
         label_height = np.floor(np.divide(int(out_meta['height']), 15))
         cmd = 'convert -background \'#0008\' -fill white -gravity center \
               -size {}x{} caption:\"{}\" {} +swap -gravity north \
-              -composite {}'.format(out_meta['width'], label_height,
-                                    date, out_temp, out_temp)
+              -composite {}'.format(out_meta['width'],
+                                    label_height,
+                                    date, out_temp,
+                                    out_temp
+                                    )
         os.system(cmd)
 
     # create gif

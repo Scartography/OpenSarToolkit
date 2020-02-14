@@ -86,7 +86,6 @@ def gpt_path():
         logger.debug('ERROR: path to gpt file is incorrect. No such file.')
         sys.exit()
 
-    # logger.debug('INFO: using SNAP CL executable at {}'.format(gptfile))
     return gptfile
 
 
@@ -128,7 +127,6 @@ def remove_folder_content(folder):
     Args:
         folder: the folder, where everything should be deleted
     '''
-
     for root, dirs, files in os.walk(folder):
         for f in files:
             os.unlink(os.path.join(root, f))
@@ -145,7 +143,6 @@ def run_command(command, logfile, elapsed=True, silent=False):
         silent (bool): if you want to shut GPT up or not
 
     '''
-
     currtime = time.time()
     if silent:
         dev_null = open(os.devnull, 'w')
@@ -170,7 +167,6 @@ def run_command(command, logfile, elapsed=True, silent=False):
         with open(str(logfile), 'w') as file:
             for line in process.stderr.decode().splitlines():
                 file.write('{}\n'.format(line))
-
     if elapsed:
         timer(currtime)
 
@@ -219,36 +215,31 @@ def move_dimap(infile_prefix, outfile_prefix):
 
 
 def check_out_dimap(dimap_prefix, test_stats=True):
-
     return_code = 0
-
     # check if both dim and data exist, else return
     if not os.path.isfile('{}.dim'.format(dimap_prefix)):
         return 666
-
     if not os.path.isdir('{}.data'.format(dimap_prefix)):
         return 666
 
     # check for file size of the dim file
     dim_size_in_mb = os.path.getsize('{}.dim'.format(dimap_prefix)) / 1048576
-
-    if dim_size_in_mb < 0.2:
+    if dim_size_in_mb < 0.1:
         return 666
 
     for file in glob.glob(opj('{}.data'.format(dimap_prefix), '*.img')):
-
         # check size
         data_size_in_mb = os.path.getsize(file) / 1048576
 
-        if data_size_in_mb < 0.2:
-            logger.debug('data small')
+        if data_size_in_mb < 0.1:
+            logger.debug(
+                'BEAM DIMAP .data small of file %s', '{}.dim'.format(dimap_prefix)
+            )
             return 666
-
         if test_stats:
             # open the file
             ds = gdal.Open(file)
             stats = ds.GetRasterBand(1).GetStatistics(0, 1)
-
             # check for mean value of layer
             if stats[2] == 0:
                 return 666
@@ -260,21 +251,18 @@ def check_out_dimap(dimap_prefix, test_stats=True):
             # if difference ofmin and max is 0
             if stats[1] - stats[0] == 0:
                 return 666
-
     return return_code
 
 
 def check_out_tiff(file, test_stats=True):
-
     return_code = 0
-
     # check if both dim and data exist, else return
     if not os.path.isfile(file):
         return 666
 
     # check for file size of the dim file
     tiff_size_in_mb = os.path.getsize(file) / 1048576
-    if tiff_size_in_mb < 0.2:
+    if tiff_size_in_mb < 0.1:
         return 666
 
     if test_stats:
@@ -293,7 +281,6 @@ def check_out_tiff(file, test_stats=True):
         # if difference ofmin and max is 0
         if stats[1] - stats[0] == 0:
             return 666
-
     return return_code
 
 
@@ -317,7 +304,6 @@ def resolution_in_degree(latitude, meters):
     '''Convert resolution in meters to degree based on Latitude
 
     '''
-
     earth_radius = 6378137
     degrees_to_radians = math.pi/180.0
     radians_to_degrees = 180.0/math.pi

@@ -1,6 +1,6 @@
 import glob
 import logging
-import geopandas as gpd
+
 
 from os.path import join as opj
 from datetime import datetime
@@ -48,122 +48,6 @@ class Sentinel1SLCBatch(Sentinel1):
         self.set_ard_parameters(self.ard_type)
         self.burst_inventory = None
         self.burst_inventory_file = None
-
-    def create_burst_inventory(self, key=None, refine=True,
-                               uname=None, pword=None):
-
-        if key:
-            outfile = opj(self.inventory_dir,
-                          'bursts.{}.shp').format(key)
-            self.burst_inventory = burst.burst_inventory(
-                self.refined_inventory_dict[key],
-                outfile,
-                download_dir=self.download_dir,
-                data_mount=self.data_mount,
-                uname=uname, pword=pword)
-        else:
-            outfile = opj(self.inventory_dir,
-                          'bursts.full.shp')
-
-            self.burst_inventory = burst.burst_inventory(
-                self.inventory,
-                outfile,
-                download_dir=self.download_dir,
-                data_mount=self.data_mount,
-                uname=uname, pword=pword)
-
-        if refine:
-            # logger.debug('{}.refined.shp'.format(outfile[:-4]))
-            self.burst_inventory = burst.refine_burst_inventory(
-                self.aoi, self.burst_inventory,
-                '{}.refined.shp'.format(outfile[:-4])
-            )
-
-    def read_burst_inventory(self, key):
-        '''Read the Sentinel-1 data inventory from a OST inventory shapefile
-
-        :param
-
-        '''
-
-        if key:
-            file = opj(self.inventory_dir, 'burst_inventory.{}.shp').format(
-                key)
-        else:
-            file = opj(self.inventory_dir, 'burst_inventory.shp')
-
-        # define column names of file (since in shp they are truncated)
-        # create column names for empty data frame
-        column_names = ['SceneID', 'Track', 'Direction', 'Date', 'SwathID',
-                        'AnxTime', 'BurstNr', 'geometry']
-
-        geodataframe = gpd.read_file(file)
-        geodataframe.columns = column_names
-        geodataframe['Date'] = geodataframe['Date'].astype(int)
-        geodataframe['BurstNr'] = geodataframe['BurstNr'].astype(int)
-        geodataframe['AnxTime'] = geodataframe['AnxTime'].astype(int)
-        geodataframe['Track'] = geodataframe['Track'].astype(int)
-        self.burst_inventory = geodataframe
-
-        return geodataframe
-
-    def set_ard_parameters(self, ard_type='OST Plus'):
-
-        if ard_type == 'OST Plus':
-
-            # scene specific
-            self.ard_parameters['type'] = ard_type
-            self.ard_parameters['resolution'] = 20
-            self.ard_parameters['border_noise'] = False
-            self.ard_parameters['product_type'] = 'RTC'
-            self.ard_parameters['to_db'] = False
-            self.ard_parameters['speckle_filter'] = False
-            self.ard_parameters['pol_speckle_filter'] = True
-            self.ard_parameters['ls_mask_create'] = True
-            self.ard_parameters['ls_mask_apply'] = False
-            self.ard_parameters['dem'] = 'SRTM 1Sec HGT'
-            self.ard_parameters['coherence'] = True
-            self.ard_parameters['polarimetry'] = True
-
-            # timeseries specific
-            self.ard_parameters['to_db_mt'] = True
-            self.ard_parameters['mt_speckle_filter'] = True
-            self.ard_parameters['datatype'] = 'float32'
-
-            # timescan specific
-            self.ard_parameters['metrics'] = ['avg', 'max', 'min',
-                                              'std', 'cov']
-            self.ard_parameters['outlier_removal'] = True
-
-        elif ard_type == 'Zhuo':
-
-            # scene specific
-            self.ard_parameters['type'] = ard_type
-            self.ard_parameters['resolution'] = 25
-            self.ard_parameters['border_noise'] = False
-            self.ard_parameters['product_type'] = 'RTC'
-            self.ard_parameters['to_db'] = False
-            self.ard_parameters['speckle_filter'] = True
-            self.ard_parameters['pol_speckle_filter'] = True
-            self.ard_parameters['ls_mask_create'] = False
-            self.ard_parameters['ls_mask_apply'] = False
-            self.ard_parameters['dem'] = 'SRTM 1Sec HGT'
-            self.ard_parameters['coherence'] = False
-            self.ard_parameters['polarimetry'] = True
-
-            # timeseries specific
-            self.ard_parameters['to_db_mt'] = False
-            self.ard_parameters['mt_speckle_filter'] = False
-            self.ard_parameters['datatype'] = 'float32'
-
-            # timescan specific
-            self.ard_parameters['metrics'] = ['avg', 'max', 'min',
-                                              'std', 'cov']
-            self.ard_parameters['outlier_removal'] = False
-
-        # assure that we do not convert twice to dB
-        if self.ard_parameters['to_db']:
-            self.ard_parameters['to_db_mt'] = False
 
     def burst_to_ard(self, timeseries=False, timescan=False, mosaic=False,
                      overwrite=False):

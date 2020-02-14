@@ -53,7 +53,7 @@ import itertools
 import shutil
 
 from ost import Sentinel1Scene
-from ost.s1 import grd_to_ard, ts
+from ost.s1 import grd_to_ard, timeseries as ts
 from ost.helpers import raster as ras, vector as vec
 from ost.helpers import helpers as h
 
@@ -67,27 +67,25 @@ def _create_processing_dict(inventory_df):
 
     # initialize empty dictionary
     dict_scenes = {}
-
     # get relative orbits and loop through each
     tracklist = inventory_df['relativeorbit'].unique()
     for track in tracklist:
-
         # initialize an empty list that will be filled by
         # list of scenes per acq. date
         all_ids = []
-
         # get acquisition dates and loop through each
         acquisition_dates = inventory_df['acquisitiondate'][
             inventory_df['relativeorbit'] == track].unique()
 
         # loop through dates
         for acquisition_date in acquisition_dates:
-
             # get the scene ids per acquisition_date and write into a list
             single_id = []
-            single_id.append(inventory_df['identifier'][
-                                 (inventory_df['relativeorbit'] == track) &
-                                 (inventory_df['acquisitiondate'] == acquisition_date)].tolist())
+            single_id.append(
+                inventory_df['identifier'][
+                    (inventory_df['relativeorbit'] == track) &
+                    (inventory_df['acquisitiondate'] == acquisition_date)
+                ].tolist())
 
             # append the list of scenes to the list of scenes per track
             all_ids.append(single_id[0])
@@ -95,11 +93,10 @@ def _create_processing_dict(inventory_df):
         # add this list to the dctionary and associate the track number
         # as dict key
         dict_scenes[track] = all_ids
-
     return dict_scenes
 
 
-def grd_to_ard_batch(
+def _to_ard_batch(
         inventory_df,
         download_dir,
         processing_dir,
@@ -108,18 +105,6 @@ def grd_to_ard_batch(
         subset=None,
         data_mount='/eodata'
 ):
-
-    # get params
-    resolution = ard_parameters['resolution']
-    product_type = ard_parameters['product_type']
-    ls_mask_create = ard_parameters['ls_mask_create']
-    speckle_filter = ard_parameters['speckle_filter']
-    polarisation = ard_parameters['polarisation']
-    dem = ard_parameters['dem']
-    to_db = ard_parameters['to_db']
-    border_noise = ard_parameters['border_noise']
-    resampling = ard_parameters['resampling']
-
     # we create a processing dictionary,
     # where all frames are grouped into acquisitions
     processing_dict = _create_processing_dict(inventory_df)
@@ -139,27 +124,35 @@ def grd_to_ard_batch(
                              )
             else:
                 # get the paths to the file
-                scene_paths = ([
-                    Sentinel1Scene(i).get_path(download_dir)
-                    for i in list_of_scenes
-                ])
+                for i in list_of_scenes():
+                    s1_process_scene = Sentinel1Scene(i)
+                    s1_process_scene.ard_parameters = ard_parameters
+                    s1_process_scene.create_ard(
+                        infile=Sentinel1Scene(i).get_path(download_dir),
+                        out_dir=out_dir,
+                        out_prefix=s1_process_scene.scene_id,
+                        temp_dir=temp_dir,
+                        subset=subset,
+                        polar='VV,VH,HH,HV',
+                        max_workers=int(os.cpu_count()/2)
+                    )
                 # apply the grd_to_ard function
-                grd_to_ard.grd_to_ard(
-                    scene_paths,
-                    out_dir,
-                    acquisition_date,
-                    temp_dir,
-                    resolution=resolution,
-                    product_type=product_type,
-                    ls_mask_create=ls_mask_create,
-                    speckle_filter=speckle_filter,
-                    dem=dem,
-                    to_db=to_db,
-                    border_noise=border_noise,
-                    subset=subset,
-                    polarisation=polarisation,
-                    resampling=resampling
-                )
+                # grd_to_ard.grd_to_ard(
+                #     scene_paths,
+                #     out_dir,
+                #     acquisition_date,
+                #     temp_dir,
+                #     resolution=resolution,
+                #     product_type=product_type,
+                #     ls_mask_create=ls_mask_create,
+                #     speckle_filter=speckle_filter,
+                #     dem=dem,
+                #     to_db=to_db,
+                #     border_noise=border_noise,
+                #     subset=subset,
+                #     polarisation=polarisation,
+                #     resampling=resampling
+                # )
 
 
 def ards_to_timeseries(
@@ -274,11 +267,11 @@ def ards_to_timeseries(
                     # sort them
                     dates.sort()
                     # write them back to string for following loop
-                    sortedDates = [
+                    sorted_dates = [
                         datetime.datetime.strftime(ts, "%d%b%Y") for ts in dates
                     ]
                     i, outfiles = 1, []
-                    for date in sortedDates:
+                    for date in sorted_dates:
                         # restructure date to YYMMDD
                         indate = datetime.datetime.strptime(date, '%d%b%Y')
                         outdate = datetime.datetime.strftime(indate, '%y%m%d')
@@ -330,8 +323,6 @@ def timeseries_to_timescan(
         processing_dir,
         ard_parameters
 ):
-
-    return_code = 666
     metrics = ard_parameters['metrics']
     outlier_removal = ard_parameters['outlier_removal']
 
@@ -488,20 +479,19 @@ def mosaic_timeseries(inventory_df, processing_dir, temp_dir):
                         if os.path.isfile(outfile):
                             os.remove(outfile)
 
-                    return_code = h.check_out_tiff(outfile)
-                    if return_code != 0:
-                        if os.path.isfile(outfile):
-                            os.remove(outfile)
-
                     # write file, so we know this ts has been succesfully processed
-                    if return_code == 0:
-                        with open(str(check_file), 'w') as file:
-                            file.write('passed all tests \n')
+                    with open(str(check_file), 'w') as file:
+                        file.write('passed all tests \n')
         # create vrt
         vrt_options = gdal.BuildVRTOptions(srcNodata=0, separate=True)
-        gdal.BuildVRT(opj(processing_dir, 'Mosaic', 'Timeseries', 'Timeseries.{}.vrt'.format(p)),
-                      outfiles,
-                      options=vrt_options)
+        gdal.BuildVRT(opj(
+            processing_dir,
+            'Mosaic',
+            'Timeseries',
+            'Timeseries.{}.vrt'.format(p)),
+            outfiles,
+            options=vrt_options
+        )
 
 
 def mosaic_timescan(
@@ -563,22 +553,17 @@ def mosaic_timescan(
                     cmd = ('otbcli_Mosaic -ram 4096 -progress 1 \
                                 -comp.feather large -harmo.method band \
                                 -harmo.cost rmse -temp_dir {} -il {} \
-                                -out {}'.format(temp_dir, filelist, outfile))
+                                -out {}'.format(temp_dir, filelist, outfile)
+                           )
 
                     return_code = h.run_command(cmd, logfile)
                     if return_code != 0:
                         if os.path.isfile(outfile):
                             os.remove(outfile)
 
-                    return_code = h.check_out_tiff(outfile)
-                    if return_code != 0:
-                        if os.path.isfile(outfile):
-                            os.remove(outfile)
-
                     # write file, so we know this ts has been succesfully processed
-                    if return_code == 0:
-                        with open(str(check_file), 'w') as file:
-                            file.write('passed all tests \n')
+                    with open(str(check_file), 'w') as file:
+                        file.write('passed all tests \n')
     # create vrt
     vrt_options = gdal.BuildVRTOptions(srcNodata=0, separate=True)
     gdal.BuildVRT(opj(processing_dir, 'Mosaic', 'Timescan', 'Timescan.vrt'),

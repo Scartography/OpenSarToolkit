@@ -9,8 +9,10 @@ from os.path import join as opj
 from datetime import datetime
 from shapely.wkt import loads
 
+from ost.s1 import burst
 from ost.helpers import vector as vec
-from ost.s1 import search, refine, s1_dl, grd_batch
+from ost.s1 import search, refine, s1_dl, batch
+from ost.s1.batch import _to_ard_batch
 from ost.helpers import scihub, helpers as h
 from ost.settings import SNAP_S1_RESAMPLING_METHODS, ARD_TIMESCAN_METRICS
 
@@ -373,139 +375,7 @@ class Sentinel1Batch(Sentinel1):
                  product_type='SLC',
                  beam_mode='IW',
                  polarisation='*',
-                 ard_type='OST'
-                 ):
-
-        super().__init__(project_dir, aoi, start, end, data_mount, mirror,
-                         metadata_concurency, download_dir, inventory_dir,
-                         processing_dir, temp_dir, product_type, beam_mode,
-                         polarisation
-                         )
-
-        self.ard_type = ard_type
-        self.ard_parameters = {}
-        self.set_ard_parameters(self.ard_type)
-        self.burst_inventory = None
-        self.burst_inventory_file = None
-
-    # processing related functions
-    def set_ard_parameters(self, ard_type='OST'):
-        if ard_type == 'OST':
-            self.ard_parameters['type'] = ard_type
-            self.ard_parameters['resolution'] = 20
-            self.ard_parameters['border_noise'] = True
-            self.ard_parameters['product_type'] = 'GTCgamma'
-            self.ard_parameters['speckle_filter'] = False
-            self.ard_parameters['ls_mask_create'] = False
-            self.ard_parameters['to_db'] = False
-            self.ard_parameters['polarisation'] = 'VV,VH,HH,HV'
-            self.ard_parameters['dem'] = 'SRTM 1Sec HGT'
-            self.ard_parameters['resampling'] = SNAP_S1_RESAMPLING_METHODS[2]
-            # time-series specific
-            self.ard_parameters['mt_speckle_filter'] = True
-            self.ard_parameters['to_db_mt'] = True
-            self.ard_parameters['datatype'] = 'float32'
-            self.ard_parameters['ls_mask_apply'] = False
-            # timescan specific
-            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRICS
-            self.ard_parameters['outlier_removal'] = True
-        elif ard_type == 'OST_flat':
-            self.ard_parameters['type'] = ard_type
-            self.ard_parameters['resolution'] = 20
-            self.ard_parameters['border_noise'] = True
-            self.ard_parameters['product_type'] = 'RTC'
-            self.ard_parameters['speckle_filter'] = False
-            self.ard_parameters['ls_mask_create'] = True
-            self.ard_parameters['to_db'] = False
-            self.ard_parameters['polarisation'] = 'VV,VH,HH,HV'
-            self.ard_parameters['dem'] = 'SRTM 1Sec HGT'
-            self.ard_parameters['resampling'] = SNAP_S1_RESAMPLING_METHODS[2]
-            # time-series specific
-            self.ard_parameters['mt_speckle_filter'] = True
-            self.ard_parameters['to_db_mt'] = True
-            self.ard_parameters['datatype'] = 'float32'
-            self.ard_parameters['ls_mask_apply'] = False
-            # timescan specific
-            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRICS
-            self.ard_parameters['outlier_removal'] = True
-        elif ard_type == 'CEOS':
-            self.ard_parameters['type'] = ard_type
-            self.ard_parameters['resolution'] = 10
-            self.ard_parameters['border_noise'] = True
-            self.ard_parameters['product_type'] = 'RTC'
-            self.ard_parameters['speckle_filter'] = False
-            self.ard_parameters['ls_mask_create'] = False
-            self.ard_parameters['to_db'] = False
-            self.ard_parameters['polarisation'] = 'VV,VH,HH,HV'
-            self.ard_parameters['dem'] = 'SRTM 1Sec HGT'
-            self.ard_parameters['resampling'] = SNAP_S1_RESAMPLING_METHODS[3]
-            # time-series specific
-            self.ard_parameters['mt_speckle_filter'] = False
-            self.ard_parameters['to_db_mt'] = False
-            self.ard_parameters['datatype'] = 'float32'
-            self.ard_parameters['ls_mask_apply'] = False
-            # timescan specific
-            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRICS
-            self.ard_parameters['outlier_removal'] = False
-        elif ard_type == 'EarthEngine':
-            self.ard_parameters['type'] = ard_type
-            self.ard_parameters['resolution'] = 10
-            self.ard_parameters['border_noise'] = True
-            self.ard_parameters['product_type'] = 'GTCsigma'
-            self.ard_parameters['speckle_filter'] = False
-            self.ard_parameters['ls_mask_create'] = False
-            self.ard_parameters['to_db'] = True
-            self.ard_parameters['polarisation'] = 'VV,VH,HH,HV'
-            self.ard_parameters['dem'] = 'SRTM 1Sec HGT'
-            self.ard_parameters['resampling'] = SNAP_S1_RESAMPLING_METHODS[3]
-            # time-series specific
-            self.ard_parameters['mt_speckle_filter'] = False
-            self.ard_parameters['to_db_mt'] = False
-            self.ard_parameters['datatype'] = 'float32'
-            self.ard_parameters['ls_mask_apply'] = False
-            # timescan specific
-            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRICS
-            self.ard_parameters['outlier_removal'] = False
-        elif ard_type == 'Zhuo':
-            self.ard_parameters['type'] = ard_type
-            self.ard_parameters['resolution'] = 25
-            self.ard_parameters['border_noise'] = False
-            self.ard_parameters['product_type'] = 'RTC'
-            self.ard_parameters['speckle_filter'] = True
-            self.ard_parameters['ls_mask_create'] = True
-            self.ard_parameters['to_db'] = True
-            self.ard_parameters['dem'] = 'SRTM 1Sec HGT'
-            self.ard_parameters['resampling'] = SNAP_S1_RESAMPLING_METHODS[2]
-            # time-series specific
-            self.ard_parameters['mt_speckle_filter'] = False
-            self.ard_parameters['to_db_mt'] = False
-            self.ard_parameters['datatype'] = 'float32'
-            self.ard_parameters['ls_mask_apply'] = False
-            # timescan specific
-            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRICS
-            self.ard_parameters['outlier_removal'] = False
-
-
-class Sentinel1GRDBatch(Sentinel1):
-    '''A Sentinel-1 specific subclass of the Generic OST class
-
-    This subclass creates a Sentinel-1 specific
-    '''
-    def __init__(self,
-                 project_dir,
-                 aoi,
-                 start='2014-10-01',
-                 end=datetime.today().strftime("%Y-%m-%d"),
-                 data_mount='/eodata',
-                 mirror=2,
-                 metadata_concurency=1,
-                 download_dir=None,
-                 inventory_dir=None,
-                 processing_dir=None,
-                 temp_dir=None,
-                 product_type='SLC',
-                 beam_mode='IW',
-                 polarisation='*',
+                 rel_orbit='*',
                  ard_type='OST'
                  ):
 
@@ -520,109 +390,8 @@ class Sentinel1GRDBatch(Sentinel1):
         self.set_ard_parameters(ard_type)
 
     # processing related functions
-    def set_ard_parameters(self, ard_type='OST'):
-        if ard_type == 'OST':
-            self.ard_parameters['type'] = ard_type
-            self.ard_parameters['resolution'] = 20
-            self.ard_parameters['border_noise'] = True
-            self.ard_parameters['product_type'] = 'GTCgamma'
-            self.ard_parameters['speckle_filter'] = False
-            self.ard_parameters['ls_mask_create'] = False
-            self.ard_parameters['to_db'] = False
-            self.ard_parameters['polarisation'] = 'VV,VH,HH,HV'
-            self.ard_parameters['dem'] = 'SRTM 1Sec HGT'
-            self.ard_parameters['resampling'] = SNAP_S1_RESAMPLING_METHODS[2]
-            # time-series specific
-            self.ard_parameters['mt_speckle_filter'] = True
-            self.ard_parameters['to_db_mt'] = True
-            self.ard_parameters['datatype'] = 'float32'
-            self.ard_parameters['ls_mask_apply'] = False
-            # timescan specific
-            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRICS
-            self.ard_parameters['outlier_removal'] = True
-        elif ard_type == 'OST_flat':
-            self.ard_parameters['type'] = ard_type
-            self.ard_parameters['resolution'] = 20
-            self.ard_parameters['border_noise'] = True
-            self.ard_parameters['product_type'] = 'RTC'
-            self.ard_parameters['speckle_filter'] = False
-            self.ard_parameters['ls_mask_create'] = True
-            self.ard_parameters['to_db'] = False
-            self.ard_parameters['polarisation'] = 'VV,VH,HH,HV'
-            self.ard_parameters['dem'] = 'SRTM 1Sec HGT'
-            self.ard_parameters['resampling'] = SNAP_S1_RESAMPLING_METHODS[2]
-            # time-series specific
-            self.ard_parameters['mt_speckle_filter'] = True
-            self.ard_parameters['to_db_mt'] = True
-            self.ard_parameters['datatype'] = 'float32'
-            self.ard_parameters['ls_mask_apply'] = False
-            # timescan specific
-            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRICS
-            self.ard_parameters['outlier_removal'] = True
-        elif ard_type == 'CEOS':
-            self.ard_parameters['type'] = ard_type
-            self.ard_parameters['resolution'] = 10
-            self.ard_parameters['border_noise'] = True
-            self.ard_parameters['product_type'] = 'RTC'
-            self.ard_parameters['speckle_filter'] = False
-            self.ard_parameters['ls_mask_create'] = False
-            self.ard_parameters['to_db'] = False
-            self.ard_parameters['polarisation'] = 'VV,VH,HH,HV'
-            self.ard_parameters['dem'] = 'SRTM 1Sec HGT'
-            # time-series specific
-            self.ard_parameters['mt_speckle_filter'] = False
-            self.ard_parameters['to_db_mt'] = False
-            self.ard_parameters['datatype'] = 'float32'
-            self.ard_parameters['ls_mask_apply'] = False
-            self.ard_parameters['resampling'] = SNAP_S1_RESAMPLING_METHODS[3]
-            # timescan specific
-            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRICS
-            self.ard_parameters['outlier_removal'] = False
-        elif ard_type == 'EarthEngine':
-            self.ard_parameters['type'] = ard_type
-            self.ard_parameters['resolution'] = 10
-            self.ard_parameters['border_noise'] = True
-            self.ard_parameters['product_type'] = 'GTCsigma'
-            self.ard_parameters['speckle_filter'] = False
-            self.ard_parameters['ls_mask_create'] = False
-            self.ard_parameters['to_db'] = True
-            self.ard_parameters['polarisation'] = 'VV,VH,HH,HV'
-            self.ard_parameters['dem'] = 'SRTM 1Sec HGT'
-            self.ard_parameters['resampling'] = SNAP_S1_RESAMPLING_METHODS[3]
-            # time-series specific
-            self.ard_parameters['mt_speckle_filter'] = False
-            self.ard_parameters['to_db_mt'] = False
-            self.ard_parameters['datatype'] = 'float32'
-            self.ard_parameters['ls_mask_apply'] = False
-            # timescan specific
-            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRICS
-            self.ard_parameters['outlier_removal'] = False
-        elif ard_type == 'Zhuo':
-            self.ard_parameters['type'] = ard_type
-            self.ard_parameters['resolution'] = 25
-            self.ard_parameters['border_noise'] = False
-            self.ard_parameters['product_type'] = 'RTC'
-            self.ard_parameters['speckle_filter'] = True
-            self.ard_parameters['ls_mask_create'] = True
-            self.ard_parameters['to_db'] = True
-            self.ard_parameters['dem'] = 'SRTM 1Sec HGT'
-            self.ard_parameters['resampling'] = SNAP_S1_RESAMPLING_METHODS[2]
-            # time-series specific
-            self.ard_parameters['mt_speckle_filter'] = False
-            self.ard_parameters['to_db_mt'] = False
-            self.ard_parameters['datatype'] = 'float32'
-            self.ard_parameters['ls_mask_apply'] = False
-            # timescan specific
-            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRICS
-            self.ard_parameters['outlier_removal'] = False
 
-    def grd_to_ard(self,
-                   subset=None,
-                   timeseries=False,
-                   timescan=False,
-                   mosaic=False,
-                   overwrite=False
-                   ):
+    def _to_ard(self, subset=None, overwrite=False):
         if overwrite:
             logger.debug('INFO: Deleting processing folder to start from scratch')
             h.remove_folder_content(self.processing_dir)
@@ -662,7 +431,7 @@ class Sentinel1GRDBatch(Sentinel1):
         while len(
                 self.inventory.groupby(['relativeorbit', 'acquisitiondate'])
         ) > nr_of_processed:
-            grd_batch.grd_to_ard_batch(
+            _to_ard_batch(
                 self.inventory,
                 self.download_dir,
                 self.processing_dir,
@@ -679,51 +448,230 @@ class Sentinel1GRDBatch(Sentinel1):
             if i == 5:
                 break
 
-        if timeseries or timescan:
+    def create_timeseries(self):
+        nr_of_processed = len(
+            glob.glob(opj(self.processing_dir, '*', 'Timeseries', '.processed'))
+        )
+        # nr_of_tracks = inventory_df.relativeorbit.unique().values
+        # check and retry function
+        i = 0
+        while len(self.inventory.relativeorbit.unique()) > nr_of_processed:
+            batch.ards_to_timeseries(self.inventory,
+                                     self.processing_dir,
+                                     self.temp_dir,
+                                     self.ard_parameters
+                                     )
             nr_of_processed = len(
-                glob.glob(opj(self.processing_dir, '*', 'Timeseries', '.processed'))
+                glob.glob(opj(self.processing_dir, '*',
+                              'Timeseries', '.processed'))
             )
-            # nr_of_tracks = inventory_df.relativeorbit.unique().values
-            # check and retry function
-            i = 0
-            while len(self.inventory.relativeorbit.unique()) > nr_of_processed:
-                grd_batch.ards_to_timeseries(self.inventory,
-                                             self.processing_dir,
-                                             self.temp_dir,
-                                             self.ard_parameters
-                                             )
-                nr_of_processed = len(
-                    glob.glob(opj(self.processing_dir, '*',
-                                  'Timeseries', '.processed'))
-                )
-                i += 1
-                # not more than 5 trys
-                if i == 5:
-                    break
-            
-        if timescan:
-            nr_of_processed = len(
-                glob.glob(opj(
-                    self.processing_dir, '*', 'Timescan', '.processed')
-                )
+            i += 1
+            # not more than 5 trys
+            if i == 5:
+                break
+
+    def create_timescan(self):
+        nr_of_processed = len(
+            glob.glob(opj(
+                self.processing_dir, '*', 'Timescan', '.processed')
             )
-            i = 0
-            while len(self.inventory.relativeorbit.unique()) > nr_of_processed:
-                grd_batch.timeseries_to_timescan(
-                    self.inventory,
-                    self.processing_dir,
-                    self.ard_parameters
-                )
-                nr_of_processed = len(glob.glob(opj(
-                    self.processing_dir, '*', 'Timescan', '.processed')))
-                i += 1
-        
-                # not more than 5 trys
-                if i == 5:
-                    break
-        if mosaic and timeseries and not subset:
-            grd_batch.mosaic_timeseries(
+        )
+        i = 0
+        while len(self.inventory.relativeorbit.unique()) > nr_of_processed:
+            batch.timeseries_to_timescan(
+                self.inventory,
+                self.processing_dir,
+                self.ard_parameters
+            )
+            nr_of_processed = len(glob.glob(opj(
+                self.processing_dir, '*', 'Timescan', '.processed')))
+            i += 1
+
+            # not more than 5 trys
+            if i == 5:
+                break
+
+    def create_mosaic(self, subset):
+        if subset is None:
+            batch.mosaic_timeseries(
                 self.inventory,
                 self.processing_dir,
                 self.temp_dir
             )
+        else:
+            batch.mosaic_timeseries(
+                self.inventory,
+                self.processing_dir,
+                self.temp_dir
+            )
+
+    def create_burst_inventory(self,
+                               key=None,
+                               refine=True,
+                               uname=None,
+                               pword=None
+                               ):
+        if self.product_type != 'SLC':
+            raise TypeError('Product needs to be SLC!')
+
+        if key:
+            outfile = opj(self.inventory_dir,
+                          'bursts.{}.shp').format(key)
+            self.burst_inventory = burst.burst_inventory(
+                self.refined_inventory_dict[key],
+                outfile,
+                download_dir=self.download_dir,
+                data_mount=self.data_mount,
+                uname=uname, pword=pword)
+        else:
+            outfile = opj(self.inventory_dir,
+                          'bursts.full.shp'
+                          )
+
+            self.burst_inventory = burst.burst_inventory(
+                self.inventory,
+                outfile,
+                download_dir=self.download_dir,
+                data_mount=self.data_mount,
+                uname=uname, pword=pword
+            )
+
+        if refine:
+            # logger.debug('{}.refined.shp'.format(outfile[:-4]))
+            self.burst_inventory = burst.refine_burst_inventory(
+                self.aoi, self.burst_inventory,
+                '{}.refined.shp'.format(outfile[:-4])
+            )
+
+    def read_burst_inventory(self, key):
+        '''Read the Sentinel-1 data inventory from a OST inventory shapefile
+
+        :param
+
+        '''
+        if self.product_type != 'SLC':
+            raise TypeError('Product needs to be SLC!')
+
+        if key:
+            file = opj(self.inventory_dir, 'burst_inventory.{}.shp').format(
+                key)
+        else:
+            file = opj(self.inventory_dir, 'burst_inventory.shp')
+
+        # define column names of file (since in shp they are truncated)
+        # create column names for empty data frame
+        column_names = [
+            'SceneID',
+            'Track',
+            'Direction',
+            'Date',
+            'SwathID',
+            'AnxTime',
+            'BurstNr',
+            'geometry'
+        ]
+
+        geodataframe = gpd.read_file(file)
+        geodataframe.columns = column_names
+        geodataframe['Date'] = geodataframe['Date'].astype(int)
+        geodataframe['BurstNr'] = geodataframe['BurstNr'].astype(int)
+        geodataframe['AnxTime'] = geodataframe['AnxTime'].astype(int)
+        geodataframe['Track'] = geodataframe['Track'].astype(int)
+        self.burst_inventory = geodataframe
+        return geodataframe
+
+    def set_ard_parameters(self, ard_type='OST'):
+        if ard_type == 'OST':
+            self.ard_parameters['type'] = ard_type
+            self.ard_parameters['resolution'] = 20
+            self.ard_parameters['border_noise'] = True
+            self.ard_parameters['product_type'] = 'GTCgamma'
+            self.ard_parameters['speckle_filter'] = False
+            self.ard_parameters['ls_mask_create'] = False
+            self.ard_parameters['to_db'] = False
+            self.ard_parameters['polarisation'] = 'VV,VH,HH,HV'
+            self.ard_parameters['dem'] = 'SRTM 1Sec HGT'
+            self.ard_parameters['resampling'] = SNAP_S1_RESAMPLING_METHODS[2]
+            # time-series specific
+            self.ard_parameters['mt_speckle_filter'] = True
+            self.ard_parameters['to_db_mt'] = True
+            self.ard_parameters['datatype'] = 'float32'
+            self.ard_parameters['ls_mask_apply'] = False
+            # timescan specific
+            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRICS
+            self.ard_parameters['outlier_removal'] = True
+        elif ard_type == 'OST_flat':
+            self.ard_parameters['type'] = ard_type
+            self.ard_parameters['resolution'] = 20
+            self.ard_parameters['border_noise'] = True
+            self.ard_parameters['product_type'] = 'RTC'
+            self.ard_parameters['speckle_filter'] = False
+            self.ard_parameters['ls_mask_create'] = True
+            self.ard_parameters['to_db'] = False
+            self.ard_parameters['polarisation'] = 'VV,VH,HH,HV'
+            self.ard_parameters['dem'] = 'SRTM 1Sec HGT'
+            self.ard_parameters['resampling'] = SNAP_S1_RESAMPLING_METHODS[2]
+            # time-series specific
+            self.ard_parameters['mt_speckle_filter'] = True
+            self.ard_parameters['to_db_mt'] = True
+            self.ard_parameters['datatype'] = 'float32'
+            self.ard_parameters['ls_mask_apply'] = False
+            # timescan specific
+            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRICS
+            self.ard_parameters['outlier_removal'] = True
+        elif ard_type == 'CEOS':
+            self.ard_parameters['type'] = ard_type
+            self.ard_parameters['resolution'] = 10
+            self.ard_parameters['border_noise'] = True
+            self.ard_parameters['product_type'] = 'RTC'
+            self.ard_parameters['speckle_filter'] = False
+            self.ard_parameters['ls_mask_create'] = False
+            self.ard_parameters['to_db'] = False
+            self.ard_parameters['polarisation'] = 'VV,VH,HH,HV'
+            self.ard_parameters['dem'] = 'SRTM 1Sec HGT'
+            # time-series specific
+            self.ard_parameters['mt_speckle_filter'] = False
+            self.ard_parameters['to_db_mt'] = False
+            self.ard_parameters['datatype'] = 'float32'
+            self.ard_parameters['ls_mask_apply'] = False
+            self.ard_parameters['resampling'] = SNAP_S1_RESAMPLING_METHODS[3]
+            # timescan specific
+            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRICS
+            self.ard_parameters['outlier_removal'] = False
+        elif ard_type == 'EarthEngine':
+            self.ard_parameters['type'] = ard_type
+            self.ard_parameters['resolution'] = 10
+            self.ard_parameters['border_noise'] = True
+            self.ard_parameters['product_type'] = 'GTCsigma'
+            self.ard_parameters['speckle_filter'] = False
+            self.ard_parameters['ls_mask_create'] = False
+            self.ard_parameters['to_db'] = True
+            self.ard_parameters['polarisation'] = 'VV,VH,HH,HV'
+            self.ard_parameters['dem'] = 'SRTM 1Sec HGT'
+            self.ard_parameters['resampling'] = SNAP_S1_RESAMPLING_METHODS[3]
+            # time-series specific
+            self.ard_parameters['mt_speckle_filter'] = False
+            self.ard_parameters['to_db_mt'] = False
+            self.ard_parameters['datatype'] = 'float32'
+            self.ard_parameters['ls_mask_apply'] = False
+            # timescan specific
+            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRICS
+            self.ard_parameters['outlier_removal'] = False
+        elif ard_type == 'Zhuo':
+            self.ard_parameters['type'] = ard_type
+            self.ard_parameters['resolution'] = 25
+            self.ard_parameters['border_noise'] = False
+            self.ard_parameters['product_type'] = 'RTC'
+            self.ard_parameters['speckle_filter'] = True
+            self.ard_parameters['ls_mask_create'] = True
+            self.ard_parameters['to_db'] = True
+            self.ard_parameters['dem'] = 'SRTM 1Sec HGT'
+            self.ard_parameters['resampling'] = SNAP_S1_RESAMPLING_METHODS[2]
+            # time-series specific
+            self.ard_parameters['mt_speckle_filter'] = False
+            self.ard_parameters['to_db_mt'] = False
+            self.ard_parameters['datatype'] = 'float32'
+            self.ard_parameters['ls_mask_apply'] = False
+            # timescan specific
+            self.ard_parameters['metrics'] = ARD_TIMESCAN_METRICS
+            self.ard_parameters['outlier_removal'] = False

@@ -3,6 +3,7 @@ from os.path import join as opj
 import numpy as np
 import glob
 import logging
+import matplotlib.pyplot as plt
 
 import gdal
 import osr
@@ -40,8 +41,9 @@ def read_file(rasterfn):
     if data_type_name == "Byte":
         data_type_name = "uint8"
 
-    logger.debug('INFO: Importing {} bands from {}'.format(raster.RasterCount,
-                                                     rasterfn))
+    logger.debug(
+        'INFO: Importing {} bands from {}'.format(raster.RasterCount, rasterfn)
+    )
 
     geotransform = raster.GetGeoTransform()
     origin_x = geotransform[0]
@@ -63,8 +65,12 @@ def read_file(rasterfn):
             'outR': outraster_srs}
 
 
-def create_file(newraster, geodict, bands, compression='None'):
-
+def create_file(
+        newraster,
+        geodict,
+        bands,
+        compression='None'
+):
     blocksize_x = 'BLOCKXSIZE={}'.format(geodict['xB'])
     blocksize_y = 'BLOCKYSIZE={}'.format(geodict['yB'])
     comp = 'COMPRESS={}'.format(compression)
@@ -72,7 +78,6 @@ def create_file(newraster, geodict, bands, compression='None'):
         tiled = 'YES'
     else:
         tiled = 'NO'
-
     if compression is None:
         opts = ['TILED={}'.format(tiled), 'BIGTIFF=IF_SAFER',
                 blocksize_x, blocksize_y]
@@ -80,56 +85,63 @@ def create_file(newraster, geodict, bands, compression='None'):
         opts = ['TILED={}'.format(tiled), 'BIGTIFF=IF_SAFER',
                 blocksize_x, blocksize_y, comp]
 
-    outraster = geodict['driver'].Create(newraster, geodict['cols'],
-                                         geodict['rows'], bands,
-                                         geodict['dType'], options=opts)
+    outraster = geodict['driver'].Create(newraster,
+                                         geodict['cols'],
+                                         geodict['rows'],
+                                         bands,
+                                         geodict['dType'],
+                                         options=opts
+                                         )
 
     outraster.SetGeoTransform((geodict['oX'],
                                geodict['pW'],
                                0,
                                geodict['oY'],
                                0,
-                               geodict['pH']))
+                               geodict['pH'])
+                              )
 
     outraster.SetProjection(geodict['outR'].ExportToWkt())
-
     if geodict['ndv'] is not None:
         outraster.GetRasterBand(1).SetNoDataValue(geodict['ndv'])
-
     return outraster
 
 
 # write chunks of arrays to an already existent raster
-def chunk_to_raster(outraster, array_chunk, ndv, x_pos, y_pos, z_pos):
-
+def chunk_to_raster(
+        outraster,
+        array_chunk,
+        ndv,
+        x_pos,
+        y_pos,
+        z_pos
+):
     outraster = gdal.Open(outraster, gdal.GA_Update)
     outband = outraster.GetRasterBand(z_pos)
-
     # write to array
     outband.WriteArray(array_chunk, x_pos, y_pos, z_pos)
 
 
-def replace_value(rasterfn, value_to_replace, new_value):
-
+def replace_value(
+        rasterfn,
+        value_to_replace,
+        new_value
+):
     # open raster file
     raster = gdal.Open(rasterfn, gdal.GA_Update)
-
     # Get blocksizes for iterating over tiles (chuuks)
     my_block_size = raster.GetRasterBand(1).GetBlockSize()
     x_block_size = my_block_size[0]
     y_block_size = my_block_size[1]
-
     # Get image sizes
     cols = raster.RasterXSize
     rows = raster.RasterYSize
-
     # loop through y direction
     for y in range(0, rows, y_block_size):
         if y + y_block_size < rows:
             ysize = y_block_size
         else:
             ysize = rows - y
-
         # loop throug x direction
         for x in range(0, cols, x_block_size):
             if x + x_block_size < cols:
@@ -137,42 +149,47 @@ def replace_value(rasterfn, value_to_replace, new_value):
             else:
                 xsize = cols - x
 
-            raster_array = np.array(raster.GetRasterBand(1).ReadAsArray(
-                x, y, xsize, ysize))
-            raster_array[raster_array <= np.float32(value_to_replace)] = np.float32(
-                new_value)
-
+            raster_array = np.array(
+                raster.GetRasterBand(1).ReadAsArray(x, y, xsize, ysize)
+            )
+            raster_array[
+                raster_array <= np.float32(value_to_replace)
+            ] = np.float32(new_value)
             raster.GetRasterBand(1).WriteArray(raster_array, x, y)
 
 
-def polygonize_raster(infile, outfile, mask_value=1, driver='ESRI Shapefile'):
-
+def polygonize_raster(
+        infile,
+        outfile,
+        mask_value=1,
+        driver='ESRI Shapefile'
+):
     with rasterio.open(infile) as src:
-
         image = src.read(1)
-
         if mask_value is not None:
             mask = image == mask_value
         else:
             mask = None
-
         results = (
             {'properties': {'raster_val': v}, 'geometry': s}
             for i, (s, v)
             in enumerate(
                 shapes(image, mask=mask, transform=src.transform)))
-
         with fiona.open(
             outfile, 'w',
             driver=driver,
             crs=src.crs,
             schema={'properties': [('raster_val', 'int')],
                     'geometry': 'Polygon'}) as dst:
-
             dst.writerecords(results)
 
 
-def outline(infile, outfile, ndv=0, less_then=False):
+def outline(
+        infile,
+        outfile,
+        ndv=0,
+        less_then=False
+):
     '''
     This function returns the valid areas (i.e. non no-data areas) of a
     raster file as a shapefile.
@@ -182,12 +199,9 @@ def outline(infile, outfile, ndv=0, less_then=False):
     :param ndv: no data value of the input raster
     :return:
     '''
-
     with rasterio.open(infile) as src:
-
         # get metadata
         meta = src.meta
-
         # update driver, datatype and reduced band count
         meta.update(driver='GTiff', dtype='uint8', count=1)
         # we update the meta for more efficient looping due to
@@ -196,24 +210,19 @@ def outline(infile, outfile, ndv=0, less_then=False):
 
         # create outfiles
         with rasterio.open(
-                '{}.tif'.format(outfile[:-4]), 'w', **meta) as out_min:
-
+                '{}.tif'.format(outfile[:-4]), 'w', **meta
+        ) as out_min:
             # loop through blocks
             for _, window in out_min.block_windows(1):
-
                 # read array with all bands
                 stack = src.read(range(1, src.count + 1), window=window)
-
                 # get stats
                 min_array = np.nanmin(stack, axis=0)
-
                 if less_then is True:
                     min_array[min_array <= ndv] = 0
                 else:
                     min_array[min_array == ndv] = 0
-
                 min_array[min_array != ndv] = 1
-
                 # write to dest
                 out_min.write(np.uint8(min_array), window=window, indexes=1)
 
@@ -222,7 +231,12 @@ def outline(infile, outfile, ndv=0, less_then=False):
     os.remove('{}.tif'.format(outfile[:-4]))
 
 
-def polygonize_to_shape(inraster, out_shape, out_epsg=4326, mask=None):
+def polygonize_to_shape(
+        inraster,
+        out_shape,
+        out_epsg=4326,
+        mask=None
+):
     """
     This function takes an input raster and polygonizes it.
 
@@ -254,7 +268,6 @@ def polygonize_to_shape(inraster, out_shape, out_epsg=4326, mask=None):
 
 # convert dB to power
 def convert_to_power(db_array):
-
     pow_array = 10 ** (db_array / 10)
     return pow_array
 
@@ -267,7 +280,12 @@ def convert_to_db(pow_array):
 
 
 # rescale sar dB dat ot integer format
-def scale_to_int(float_array, min_value, max_value, datatype):
+def scale_to_int(
+        float_array,
+        min_value,
+        max_value,
+        datatype
+):
     # set output min and max
     display_min = 1.
     if datatype == 'uint8':
@@ -286,8 +304,10 @@ def scale_to_int(float_array, min_value, max_value, datatype):
 
 
 # rescale integer scaled sar data back to dB
-def rescale_to_float(int_array, data_type_name):
-
+def rescale_to_float(
+        int_array,
+        data_type_name
+):
     if data_type_name == 'uint8':
         float_array = (int_array.astype(float)
                        * (35. / 254.) + (-30. - (35. / 254.)))
@@ -295,24 +315,30 @@ def rescale_to_float(int_array, data_type_name):
         float_array = (int_array.astype(float)
                        * (35. / 65535.) + (-30. - (35. / 65535.)))
     else:
-        logger.debug('ERROR: Unknown datatype')
+        raise TypeError('ERROR: Unknown datatype')
     return float_array
 
 
-def mask_by_shape(infile, outfile, shapefile, to_db=False, datatype='float32',
-                  rescale=True, min_value=0.000001, max_value=1, ndv=None):
-
+def mask_by_shape(
+        infile,
+        outfile,
+        shapefile,
+        to_db=False,
+        datatype='float32',
+        rescale=True,
+        min_value=0.000001,
+        max_value=1,
+        ndv=None
+):
     # import shapefile geometries
     with fiona.open(shapefile, 'r') as file:
         features = [feature['geometry'] for feature in file
                     if feature['geometry']]
-
     # import raster
     with rasterio.open(infile) as src:
         out_image, out_transform = rasterio.mask.mask(src, features, crop=True)
         out_meta = src.meta.copy()
         out_image = np.ma.masked_where(out_image == ndv, out_image)
-
     # if to decibel should be applied
     if to_db is True:
         out_image = convert_to_db(out_image)
@@ -336,8 +362,10 @@ def mask_by_shape(infile, outfile, shapefile, to_db=False, datatype='float32',
 
 
 # the outlier removal, needs revision (e.g. use something profound)
-def outlier_removal(arrayin, stddev=3):
-
+def outlier_removal(
+        arrayin,
+        stddev=3
+):
     # calculate percentiles
     perc95 = np.percentile(arrayin, 95, axis=0)
     perc5 = np.percentile(arrayin, 5, axis=0)
@@ -350,7 +378,6 @@ def outlier_removal(arrayin, stddev=3):
             arrayin < perc5
             )
         )
-
     # we calculate new std and mean
     masked_std = np.std(masked_array, axis=0)
     masked_mean = np.mean(masked_array, axis=0)
@@ -371,21 +398,16 @@ def norm(band, percentile=False):
         band_min, band_max = np.percentile(band, 2), np.percentile(band, 98)
     else:
         band_min, band_max = np.nanmin(band), np.nanmax(band)
-        
     return (band - band_min)/(band_max - band_min)
 
 
 def visualise_rgb(filepath, shrink_factor=25):
-
-    import matplotlib.pyplot as plt
-
     with rasterio.open(filepath) as src:
         array = src.read(
                 out_shape=(src.count, int(src.height / shrink_factor),
                            int(src.width / shrink_factor)),
-                resampling=5    # 5 = average
+                resampling=5
                 )
-
     array[array == 0] = np.nan
     red = norm(scale_to_int(array[0], -18, 0, 'uint8'))
     green = norm(scale_to_int(array[1], -25, -5, 'uint8'))
@@ -396,35 +418,48 @@ def visualise_rgb(filepath, shrink_factor=25):
 
 
 def get_min(file):
-
-    mins = {'BS.VV': -20, 'BS.VH': -25, 'BS.HH': -20, 'BS.HV': -25,
-            'coh.VV': 0.1, 'coh.VH': 0.1,
-            'Alpha': 60, 'Entropy': 0.1, 'Anisotropy': 0.1}
-
+    mins = {
+        'BS.VV': -20,
+        'BS.VH': -25,
+        'BS.HH': -20,
+        'BS.HV': -25,
+        'coh.VV': 0.1,
+        'coh.VH': 0.1,
+        'Alpha': 60,
+        'Entropy': 0.1,
+        'Anisotropy': 0.1
+    }
     for key, items in mins.items():
         if key in file:
             return items
 
 
 def get_max(file):
-    maxs = {'BS.VV': 0, 'BS.VH': -12, 'BS.HH': 0, 'BS.HV': -5,
-            'coh.VV': 0.8, 'coh.VH': 0.75,
-            'Alpha': 80, 'Entropy': 0.8, 'Anisotropy': 0.8}
+    maxs = {
+        'BS.VV': 0,
+        'BS.VH': -12,
+        'BS.HH': 0,
+        'BS.HV': -5,
+        'coh.VV': 0.8,
+        'coh.VH': 0.75,
+        'Alpha': 80,
+        'Entropy': 0.8,
+        'Anisotropy': 0.8
+    }
     for key, items in maxs.items():
         if key in file:
             return items
 
 
-def create_rgb_jpeg(filelist,
-                    outfile=None,
-                    shrink_factor=1,
-                    plot=False,
-                    minimum_list=None,
-                    maximum_list=None,
-                    date=None
-                    ):
-
-    import matplotlib.pyplot as plt
+def create_rgb_jpeg(
+        filelist,
+        outfile=None,
+        shrink_factor=1,
+        plot=False,
+        minimum_list=None,
+        maximum_list=None,
+        date=None
+):
 
     minimum_list = []
     maximum_list = []
@@ -456,12 +491,12 @@ def create_rgb_jpeg(filelist,
             maximum_list.append(get_max(filelist[1]))
             layer2[layer2 == 0] = np.nan
             count = 3
-            
-    if len(filelist) == 2:    # that should be the BS ratio case
+
+    # that should be the BS ratio case
+    if len(filelist) == 2:
         layer3 = np.subtract(layer1, layer2)
         minimum_list.append(1)
         maximum_list.append(15)
-        
     elif len(filelist) >= 3:
         # that's the full 3layer case
         with rasterio.open(filelist[2]) as src:
@@ -489,15 +524,15 @@ def create_rgb_jpeg(filelist,
     arr = np.transpose(arr, [2, 0, 1])
 
     # update outfile's metadata
-    out_meta.update({'driver': 'JPEG',
-                     'dtype': 'uint8',
-                     'count': count})
-
+    out_meta.update({
+        'driver': 'JPEG',
+        'dtype': 'uint8',
+        'count': count
+    })
     # write array to disk
     if outfile:
         with rasterio.open(outfile, 'w', **out_meta) as out:
             out.write(arr.astype('uint8'))
-            
         if date:
             label_height = np.floor(np.divide(int(out_meta['height']), 15))
             cmd = 'convert -background \'#0008\'-fill white -gravity center \
@@ -505,7 +540,6 @@ def create_rgb_jpeg(filelist,
                   -composite {}'.format(out_meta['width'], label_height,
                                         date, outfile, outfile)
             h.run_command(cmd, '{}.log'.format(outfile), elapsed=False)
-            
     if plot:
         plt.imshow(arr)
 
@@ -527,13 +561,17 @@ def create_timeseries_animation(
         nr_of_products = nr_of_products - 1
     # Iterate over the tifs from the timeseries
     for i in range(nr_of_products):
-        filelist = [glob.glob(opj(timeseries_folder, '{}.*{}*tif'.format(i + 1, product)))[0] for product in product_list]
+        filelist = [glob.glob(
+            opj(timeseries_folder, '{}.*{}*tif'.format(i + 1, product))
+        )[0]
+                    for product in product_list
+                    ]
         dates = os.path.basename(filelist[0]).split('.')[1]
         if add_dates:
             date = dates
         else:
             date = None
-        
+
         create_rgb_jpeg(filelist, 
                         opj(out_folder, '{}.{}.jpeg'.format(i+1, dates)),
                         shrink_factor, 
@@ -582,14 +620,14 @@ def np_binary_erosion(
     # A 5x5 structure, will need 2 additional cells around the edge
     pad_shape = (
         input_shape[0] + structure.shape[0] - 1,
-        input_shape[1] + structure.shape[1] - 1)
+        input_shape[1] + structure.shape[1] - 1
+    )
     input_pad_array = np.zeros(pad_shape).astype(np.bool)
     input_pad_array[1:rows+1, 1:cols+1] = input_array
     binary_erosion = np.zeros(pad_shape).astype(np.bool)
 
     # Cast structure element to boolean
     struc_mask = structure.astype(np.bool)
-
     # Iterate over each cell
     for row in range(rows):
         for col in range(cols):

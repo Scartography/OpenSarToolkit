@@ -4,7 +4,7 @@ import pytest
 from os.path import join as opj
 from shapely.geometry import box
 from tempfile import TemporaryDirectory
-from ost.project import Sentinel1 as Sen1, Sentinel1GRDBatch as SenGRD
+from ost.project import Sentinel1 as Sen1, Sentinel1Batch as SenBatch
 
 from ost.settings import HERBERT_USER, SINGLE_ARD_OPTIONS
 
@@ -53,7 +53,7 @@ def test_sentinel1_grd_batch(some_bounds):
             TemporaryDirectory(dir=os.getcwd()) as dl_temp, \
             TemporaryDirectory(dir=os.getcwd()) as tmp_temp, \
             TemporaryDirectory(dir=os.getcwd()) as inv_temp:
-        sen1 = SenGRD(
+        sen1 = SenBatch(
             project_dir=temp,
             aoi=box(some_bounds[0], some_bounds[1], some_bounds[2], some_bounds[3]).wkt,
             start='2020-01-01',
@@ -80,15 +80,14 @@ def test_sentinel1_grd_batch(some_bounds):
                       uname=HERBERT_USER['uname'],
                       pword=HERBERT_USER['asf_pword']
                       )
-        sen1.grd_to_ard(
+        sen1._to_ard(
             subset=box(
                 some_bounds[0], some_bounds[1], some_bounds[2], some_bounds[3]
             ).wkt,
-            timeseries=True,
-            timescan=True,
-            mosaic=True,
             overwrite=True
         )
+        sen1.create_timeseries()
+        sen1.create_timescan()
 
 
 @pytest.mark.skip(reason="Downlaod is tested in the batch!")
