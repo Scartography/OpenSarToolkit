@@ -213,10 +213,9 @@ def ards_to_timeseries(
                 list_of_pols = sorted(
                     glob.glob(opj(track_dir, '20*', '*TC*data', '*{}*.img'.format(p)))
                 )
-
-                if len(list_of_pols) >= 2:
-                    # create output stack name for RTC
-                    with TemporaryDirectory() as temp:
+                with TemporaryDirectory() as temp:
+                    if len(list_of_pols) >= 2:
+                        # create output stack name for RTC
                         temp_stack = opj(temp, 'stack_{}_{}'.format(track, p))
                         out_stack = opj(temp, 'mt_stack_{}_{}'.format(track, p))
 
@@ -253,57 +252,57 @@ def ards_to_timeseries(
                         else:
                             out_stack = temp_stack
 
-                    # get the dates of the files
-                    dates = [datetime.datetime.strptime(x.split('_')[-1][:-4], '%d%b%Y')
-                             for x in glob.glob(opj('{}.data'.format(out_stack), '*img'))
-                             ]
-                    # sort them
-                    dates.sort()
-                    # write them back to string for following loop
-                    sorted_dates = [
-                        datetime.datetime.strftime(ts, "%d%b%Y") for ts in dates
-                    ]
-                    i, outfiles = 1, []
-                    for date in sorted_dates:
-                        # restructure date to YYMMDD
-                        indate = datetime.datetime.strptime(date, '%d%b%Y')
-                        outdate = datetime.datetime.strftime(indate, '%y%m%d')
-                        infile = glob.glob(
-                            opj('{}.data'.format(out_stack),
-                                '*{}*{}*img'.format(p, date)
-                                )
-                        )[0]
-                        # create outFile
-                        outfile = opj(
-                            track_dir,
-                            'Timeseries',
-                            '{}.{}.BS.{}.tif'.format(i, outdate, p)
-                        )
-                        # mask by extent
-                        ras.mask_by_shape(
-                            infile, outfile,
-                            extent,
-                            to_db=to_db_mt,
-                            datatype=datatype,
-                            min_value=-30, max_value=5,
-                            ndv=0
-                        )
-                        # add ot a list for subsequent vrt creation
-                        outfiles.append(outfile)
-                        all_outfiles.append(outfile)
+                        # get the dates of the files
+                        dates = [datetime.datetime.strptime(x.split('_')[-1][:-4], '%d%b%Y')
+                                 for x in glob.glob(opj('{}.data'.format(out_stack), '*img'))
+                                 ]
+                        # sort them
+                        dates.sort()
+                        # write them back to string for following loop
+                        sorted_dates = [
+                            datetime.datetime.strftime(ts, "%d%b%Y") for ts in dates
+                        ]
+                        i, outfiles = 1, []
+                        for date in sorted_dates:
+                            # restructure date to YYMMDD
+                            indate = datetime.datetime.strptime(date, '%d%b%Y')
+                            outdate = datetime.datetime.strftime(indate, '%y%m%d')
+                            infile = glob.glob(
+                                opj('{}.data'.format(out_stack),
+                                    '*{}*{}*img'.format(p, date)
+                                    )
+                            )[0]
+                            # create outFile
+                            outfile = opj(
+                                track_dir,
+                                'Timeseries',
+                                '{}.{}.BS.{}.tif'.format(i, outdate, p)
+                            )
+                            # mask by extent
+                            ras.mask_by_shape(
+                                infile, outfile,
+                                extent,
+                                to_db=to_db_mt,
+                                datatype=datatype,
+                                min_value=-30, max_value=5,
+                                ndv=0
+                            )
+                            # add ot a list for subsequent vrt creation
+                            outfiles.append(outfile)
+                            all_outfiles.append(outfile)
 
-                        i += 1
+                            i += 1
 
-                    # build vrt of timeseries
-                    gdal.BuildVRT(opj(
-                        track_dir,
-                        'Timeseries',
-                        'BS.Timeseries.{}.vrt'.format(p)),
-                        outfiles,
-                        options=vrt_options
-                    )
-                    # if os.path.isdir('{}.data'.format(out_stack)):
-                    h.delete_dimap(out_stack)
+        # build vrt of timeseries
+        gdal.BuildVRT(opj(
+            track_dir,
+            'Timeseries',
+            'BS.Timeseries.{}.vrt'.format(p)),
+            outfiles,
+            options=vrt_options
+        )
+        # if os.path.isdir('{}.data'.format(out_stack)):
+        h.delete_dimap(out_stack)
 
             # write file, so we know this ts has been succesfully processed
             check_file = opj(track_dir, 'Timeseries', '.processed')

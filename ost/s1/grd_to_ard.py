@@ -108,7 +108,7 @@ def _grd_frame_import(infile, outfile, logfile, polarisation='VV,VH,HH,HV'):
     # construct command
     command = '{} {} -x -q {} -Pinput=\'{}\' -Ppolarisation={} \
                -Poutput=\'{}\''.format(
-        gpt_file, graph, os.cpu_count(), infile, polarisation, outfile)
+        gpt_file, graph, 2 * os.cpu_count(), infile, polarisation, outfile)
 
     # run command
     return_code = h.run_command(command, logfile)
@@ -243,7 +243,7 @@ def _grd_subset(infile, outfile, logfile, region):
 
     # construct command
     command = '{} Subset -x -q {} -Pregion={} -t \'{}\' \'{}\''.format(
-        gpt_file, os.cpu_count(), region, outfile, infile)
+        gpt_file, 2 * os.cpu_count(), region, outfile, infile)
 
     # run command and get return code
     return_code = h.run_command(command, logfile)

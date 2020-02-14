@@ -167,7 +167,7 @@ def mt_extent(
 
     logger.debug('INFO: Creating shapefile of common extent.')
     start = time.time()
-    with TemporaryDirectory as temp:
+    with TemporaryDirectory() as temp:
         outline_file = opj(temp, os.path.basename(out_file))
         ras.outline(opj(out_dir, 'extent.vrt'), outline_file, 0, False)
 
