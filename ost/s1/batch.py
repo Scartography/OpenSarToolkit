@@ -220,7 +220,7 @@ def ards_to_timeseries(
                     'Timeseries',
                     '{}.stack.errLog'.format(p)
                 )
-                if list_of_pols != []:
+                if list_of_pols == []:
                     logger.debug('This polarization is empty!')
                     continue
                 with TemporaryDirectory() as temp:
@@ -266,29 +266,27 @@ def ards_to_timeseries(
                             datetime.datetime.strptime(x.split('_')[-1][:-4], '%d%b%Y')
                             for x in glob.glob(opj('{}.data'.format(out_stack), '*img'))
                         ]
-                        # sort them
-                        dates.sort()
-                        # write them back to string for following loop
-                        sorted_dates = [
-                            datetime.datetime.strftime(ts, "%d%b%Y") for ts in dates
-                        ]
-                        out_stack_data = os.path.basename(out_stack).replace('dim', '')
+
                     else:
-                        sorted_dates = [
+                        out_stack = list_of_ards[0]
+                        dates = [
                             datetime.datetime.strptime(
                                 os.path.basename(string_of_ards).split('_')[0], '%Y%m%d'
                             )
                         ]
-                        out_stack_data = os.path.basename(string_of_ards).replace('dim',
-                                                                                  ''
-                                                                                  )
+                    # sort them
+                    dates.sort()
+                    # write them back to string for following loop
+                    sorted_dates = [
+                        datetime.datetime.strftime(ts, "%d%b%Y") for ts in dates
+                    ]
                     i, outfiles = 1, []
                     for date in sorted_dates:
                         # restructure date to YYMMDD
                         indate = datetime.datetime.strptime(date, '%d%b%Y')
                         outdate = datetime.datetime.strftime(indate, '%y%m%d')
                         infile = glob.glob(
-                            opj('{}.data'.format(out_stack_data),
+                            opj('{}.data'.format(out_stack),
                                 '*{}*{}*img'.format(p, date)
                                 )
                         )[0]
@@ -310,7 +308,6 @@ def ards_to_timeseries(
                         # add ot a list for subsequent vrt creation
                         outfiles.append(outfile)
                         all_outfiles.append(outfile)
-
                         i += 1
 
                     # build vrt of timeseries
