@@ -114,8 +114,8 @@ def ard_to_ts(
         list_of_files,
         processing_dir,
         burst,
-        proc_file,
         product,
+        ard_params,
         pol
 ):
 
@@ -131,11 +131,8 @@ def ard_to_ts(
                      )
         return
 
-    # load ard parameters
-    with open(proc_file, 'r') as ard_file:
-        ard_params = json.load(ard_file)['processing parameters']
-        ard = ard_params['single ARD']
-        ard_mt = ard_params['time-series ARD']
+    ard = ard_params
+    ard_mt = ard_params
 
     # get the db scaling right
     to_db = ard['to db']

@@ -50,6 +50,7 @@ import gdal
 import json
 import logging
 import itertools
+from tempfile import TemporaryDirectory
 
 from ost import Sentinel1Scene
 from ost.helpers import raster as ras
@@ -141,18 +142,9 @@ def _to_ard_batch(
 def ards_to_timeseries(
         inventory_df,
         processing_dir,
-        temp_dir,
-        proc_file,
-        exec_file
+        ard_params=None
 ):
-
-    # load ard parameters
-    with open(proc_file, 'r') as ard_file:
-        ard_params = json.load(ard_file)['processing parameters']
-        ard = ard_params['single ARD']
-
     for track in inventory_df.relativeorbit.unique():
-
         # get the burst directory
         track_dir = opj(processing_dir, track)
 
@@ -161,16 +153,11 @@ def ards_to_timeseries(
         list_of_scenes = [x for x in list_of_scenes if 'layover' not in x]
         extent = opj(track_dir, '{}.extent.shp'.format(track))
 
-        # placeholder for parallelisation
-        if exec_file:
-            if os.path.isfile(exec_file):
-                os.remove(exec_file)
-            logger.debug('create command')
-            continue
         logger.debug('INFO: Creating common extent mask for track {}'.format(track))
-        mt_vec.mt_extent(list_of_scenes, extent, temp_dir, -0.0018)
+        with TemporaryDirectory() as temp_dir:
+            mt_vec.mt_extent(list_of_scenes, extent, temp_dir, -0.0018)
 
-    if ard['create ls mask'] or ard['apply ls mask']:
+    if ard_params['create ls mask'] or ard_params['apply ls mask']:
         for track in inventory_df.relativeorbit.unique():
             # get the burst directory
             track_dir = opj(processing_dir, track)
@@ -185,13 +172,14 @@ def ards_to_timeseries(
             logger.debug(
                 'INFO: Creating common Layover/Shadow mask for track {}'.format(track)
             )
-            mt_vec.mt_layover(
-                list_of_layover,
-                out_ls,
-                temp_dir,
-                extent,
-                ard['apply ls mask']
-            )
+            with TemporaryDirectory() as temp_dir:
+                mt_vec.mt_layover(
+                    list_of_layover,
+                    out_ls,
+                    temp_dir,
+                    extent,
+                    ard_params['apply ls mask']
+                )
 
     for track in inventory_df.relativeorbit.unique():
         # get the burst directory
@@ -209,14 +197,12 @@ def ards_to_timeseries(
             # create list of dims if polarisation is present
             list_of_dims = sorted(glob.glob(
                 opj(track_dir, '20*', '*bs*dim')))
-
             ard_to_ts(
                 list_of_dims,
                 processing_dir,
-                temp_dir,
                 track,
-                proc_file,
-                product='bs',
+                product='BS',
+                ard_params=ard_params,
                 pol=pol
             )
 
