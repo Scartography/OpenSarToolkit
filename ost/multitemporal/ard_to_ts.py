@@ -246,7 +246,7 @@ def ard_to_ts(
 
                 ras.mask_by_shape(infile, outfile, extent,
                                   to_db=to_db,
-                                  datatype=ard_params['dtype output'],
+                                  datatype=ard_params['dtype_output'],
                                   min_value=mm_dict[stretch]['min'],
                                   max_value=mm_dict[stretch]['max'],
                                   ndv=0.0,
@@ -283,7 +283,7 @@ def ard_to_ts(
                     outfile,
                     extent,
                     to_db=to_db,
-                    datatype=ard_params['dtype output'],
+                    datatype=ard_params['dtype_output'],
                     min_value=mm_dict[stretch]['min'],
                     max_value=mm_dict[stretch]['max'],
                     ndv=0.0
