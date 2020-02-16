@@ -2,7 +2,7 @@
 DEFAULT_SPECKLE_DICT = {
     "filter": "Refined Lee",
     "ENL": 1.0,
-    "estimate_ENL": 'true',
+    "estimate_ENL": True,
     "sigma": 0.9,
     "filter_x_size": 3,
     "filter_y_size": 3,

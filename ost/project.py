@@ -564,7 +564,7 @@ class Sentinel1Batch(Sentinel1):
             # time-series specific
             self.ard_parameters['mt_speckle_filter'] = True
             self.ard_parameters['to_db_mt'] = True
-            self.ard_parameters['datatype'] = 'float32'
+            self.ard_parameters['dtype_output'] = 'float32'
             self.ard_parameters['apply_ls_mask'] = False
             self.ard_parameters['create_ls_mask'] = False
             # timescan specific
@@ -584,7 +584,7 @@ class Sentinel1Batch(Sentinel1):
             # time-series specific
             self.ard_parameters['mt_speckle_filter'] = True
             self.ard_parameters['to_db_mt'] = True
-            self.ard_parameters['datatype'] = 'float32'
+            self.ard_parameters['dtype_output'] = 'float32'
             self.ard_parameters['apply_ls_mask'] = False
             self.ard_parameters['create_ls_mask'] = False
             # timescan specific
@@ -604,7 +604,7 @@ class Sentinel1Batch(Sentinel1):
             # time-series specific
             self.ard_parameters['mt_speckle_filter'] = False
             self.ard_parameters['to_db_mt'] = False
-            self.ard_parameters['datatype'] = 'float32'
+            self.ard_parameters['dtype_output'] = 'float32'
             self.ard_parameters['apply_ls_mask'] = False
             self.ard_parameters['create_ls_mask'] = False
             # timescan specific
@@ -624,7 +624,7 @@ class Sentinel1Batch(Sentinel1):
             # time-series specific
             self.ard_parameters['mt_speckle_filter'] = False
             self.ard_parameters['to_db_mt'] = False
-            self.ard_parameters['datatype'] = 'float32'
+            self.ard_parameters['dtype_output'] = 'float32'
             self.ard_parameters['apply_ls_mask'] = False
             # timescan specific
             self.ard_parameters['metrics'] = ARD_TIMESCAN_METRICS
@@ -642,7 +642,7 @@ class Sentinel1Batch(Sentinel1):
             # time-series specific
             self.ard_parameters['mt_speckle_filter'] = False
             self.ard_parameters['to_db_mt'] = False
-            self.ard_parameters['datatype'] = 'float32'
+            self.ard_parameters['dtype_output'] = 'float32'
             self.ard_parameters['apply_ls_mask'] = False
             self.ard_parameters['create_ls_mask'] = False
             # timescan specific
