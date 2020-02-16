@@ -117,23 +117,23 @@ def mt_speckle_filter(
 def ard_to_ts(
         list_of_files,
         processing_dir,
-        burst,
+        track,
         ard_params,
         pol,
         product_suffix='TC'
 ):
-    # get the burst directory
-    burst_dir = opj(processing_dir, burst)
+    # get the track directory
+    track_dir = opj(processing_dir, track)
 
     # check routine if timeseries has already been processed
-    check_file = opj(burst_dir,
+    check_file = opj(track_dir,
                      'Timeseries',
                      '.{}.{}.processed'.format(product_suffix, pol)
                      )
     if os.path.isfile(check_file):
         logger.debug(
                      'INFO: Timeseries of {} for {} in {} polarisation already'
-                     ' processed'.format(burst, product_suffix, pol)
+                     ' processed'.format(track, product_suffix, pol)
                      )
         return
 
@@ -145,9 +145,9 @@ def ard_to_ts(
         to_db = ard_params['to_db']
 
     if ard_params['apply_ls_mask']:
-        extent = opj(burst_dir, '{}.extent.masked.shp'.format(burst))
+        extent = opj(track_dir, '{}.extent.masked.shp'.format(track))
     else:
-        extent = opj(burst_dir, '{}.extent.shp'.format(burst))
+        extent = opj(track_dir, '{}.extent.shp'.format(track))
 
     # min max dict for stretching in case of 16 or 8 bit datatype
     mm_dict = {'BS': {'min': -30, 'max': 5},
@@ -160,19 +160,19 @@ def ard_to_ts(
     stretch = pol if pol in ['Alpha', 'Anisotropy', 'Entropy'] else product_suffix
 
     # define out_dir for stacking routine
-    out_dir = opj(processing_dir, '{}'.format(burst), 'Timeseries')
+    out_dir = opj(processing_dir, '{}'.format(track), 'Timeseries')
     os.makedirs(out_dir, exist_ok=True)
 
     with TemporaryDirectory() as temp_dir:
         # create namespaces
         temp_stack = opj(
-            temp_dir, '{}_{}_{}'.format(burst, product_suffix, pol)
+            temp_dir, '{}_{}_{}'.format(track, product_suffix, pol)
         )
         out_stack = opj(
-            temp_dir, '{}_{}_{}_mt'.format(burst, product_suffix, pol)
+            temp_dir, '{}_{}_{}_mt'.format(track, product_suffix, pol)
         )
         stack_log = opj(
-            out_dir, '{}_{}_{}_stack.err_log'.format(burst, product_suffix, pol)
+            out_dir, '{}_{}_{}_stack.err_log'.format(track, product_suffix, pol)
         )
 
         # run stacking routines
@@ -181,26 +181,27 @@ def ard_to_ts(
 
         if pol in ['Alpha', 'Anisotropy', 'Entropy']:
             logger.debug(
-                'INFO: Creating multi-temporal stack of images of burst/track {} for'
+                'INFO: Creating multi-temporal stack of images of track/track {} for'
                 ' the {} band of the polarimetric H-A-Alpha'
-                ' decomposition.'.format(burst, pol)
+                ' decomposition.'.format(track, pol)
             )
             create_stack(list_of_files, temp_stack, stack_log, pattern=pol)
         else:
             logger.debug(
-                'INFO: Creating multi-temporal stack of images of burst/track {} for'
-                ' {} product_suffix in {} polarization.'.format(burst, product_suffix, pol))
+                'INFO: Creating multi-temporal stack of images of track/track {} for'
+                ' {} product_suffix in {} '
+                'polarization.'.format(track, product_suffix, pol)
+            )
             create_stack(list_of_files, temp_stack, stack_log, polarisation=pol)
 
         # run mt speckle filter
         if ard_params['mt_speckle_filter'] is True:
             speckle_log = opj(
                 out_dir,
-                '{}_{}_{}_mt_speckle.err_log'.format(burst, product_suffix, pol)
+                '{}_{}_{}_mt_speckle.err_log'.format(track, product_suffix, pol)
             )
-
             logger.debug('INFO: Applying multi-temporal speckle filter')
-            mt_speckle_filter('{}.dim'.format(temp_stack),
+            mt_speckle_filter('{}*.dim'.format(temp_stack),
                               out_stack,
                               speckle_log
                               )

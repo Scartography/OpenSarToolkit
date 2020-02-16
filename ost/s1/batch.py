@@ -199,7 +199,7 @@ def ards_to_timeseries(
                 list_of_dims,
                 processing_dir,
                 track,
-                product=product_suffix,
+                product_suffix=product_suffix,
                 ard_params=ard_params,
                 pol=pol
             )
