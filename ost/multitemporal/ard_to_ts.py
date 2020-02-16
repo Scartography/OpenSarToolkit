@@ -108,8 +108,9 @@ def mt_speckle_filter(
     if return_code == 0:
         logger.debug(' INFO: Succesfully applied multi-temporal speckle filtering')
     else:
-        logger.debug(' ERROR: Multi-temporal speckle filtering exited with an error. \
-                See {} for Snap Error output'.format(logfile))
+        raise RuntimeError('Multi-temporal speckle filtering exited with an error. \
+                See {} for Snap Error output'.format(logfile)
+                            )
 
     return return_code
 
