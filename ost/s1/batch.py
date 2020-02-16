@@ -55,7 +55,7 @@ from tempfile import TemporaryDirectory
 from ost import Sentinel1Scene
 from ost.helpers import raster as ras
 from ost.multitemporal import vector as mt_vec, timescan
-from ost.multitemporal.ard_to_ts import ard_to_ts, create_stack
+from ost.multitemporal.ard_to_ts import ard_to_ts
 from ost.mosaic import mosaic
 
 logger = logging.getLogger(__name__)
@@ -142,7 +142,8 @@ def _to_ard_batch(
 def ards_to_timeseries(
         inventory_df,
         processing_dir,
-        ard_params=None
+        ard_params=None,
+        product_suffix='TC'
 ):
     for track in inventory_df.relativeorbit.unique():
         # get the burst directory
@@ -184,24 +185,21 @@ def ards_to_timeseries(
     for track in inventory_df.relativeorbit.unique():
         # get the burst directory
         track_dir = opj(processing_dir, track)
-
         for pol in ['VV', 'VH', 'HH', 'HV']:
-
             # see if there is actually any imagery in thi polarisation
             list_of_files = sorted(glob.glob(
-                opj(track_dir, '20*', '*data*', '*ma0*{}*img'.format(pol))))
-
+                opj(track_dir, '20*', '*data*', '*ma0*{}*img'.format(pol))
+            ))
             if not len(list_of_files) > 1:
                 continue
-
             # create list of dims if polarisation is present
             list_of_dims = sorted(glob.glob(
-                opj(track_dir, '20*', '*BS*dim')))
+                opj(track_dir, '20*', '*'+product_suffix+'*dim')))
             ard_to_ts(
                 list_of_dims,
                 processing_dir,
                 track,
-                product='BS',
+                product=product_suffix,
                 ard_params=ard_params,
                 pol=pol
             )

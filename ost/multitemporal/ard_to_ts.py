@@ -33,25 +33,28 @@ def create_stack(
 
     # get path to graph
     rootpath = importlib.util.find_spec('ost').submodule_search_locations[0]
-
     if pattern:
         graph = opj(rootpath, 'graphs', 'S1_TS', '1_BS_Stacking_HAalpha.xml')
         command = '{} {} -x -q {} -Pfilelist={} -PbandPattern=\'{}.*\' \
                -Poutput={}'.format(gpt_file, graph, 2 * os.cpu_count(),
-                                   filelist, pattern, out_stack)
+                                   filelist, pattern, out_stack
+                                   )
     else:
         graph = opj(rootpath, 'graphs', 'S1_TS', '1_BS_Stacking.xml')
         command = '{} {} -x -q {} -Pfilelist={} -Ppol={} \
                -Poutput={}'.format(gpt_file, graph, 2 * os.cpu_count(),
-                                   filelist, polarisation, out_stack)
+                                   filelist, polarisation, out_stack
+                                   )
 
     return_code = h.run_command(command, logfile)
 
     if return_code == 0:
         logger.debug(' INFO: Succesfully created multi-temporal stack')
     else:
-        logger.debug(' ERROR: Stack creation exited with an error.'
-              ' See {} for Snap Error output'.format(logfile))
+        logger.debug(
+                     'ERROR: Stack creation exited with an error.'
+                     ' See {} for Snap Error output'.format(logfile)
+        )
 
     return return_code
 
@@ -76,7 +79,7 @@ def mt_speckle_filter(
                ' -PanSize={}'
                ' -PdampingFactor={}'
                ' -Penl={}'
-               ' -Pfilter={}'
+               ' -Pfilter="{}"'
                ' -PfilterSizeX={}'
                ' -PfilterSizeY={}'
                ' -PnumLooksStr={}'
@@ -119,12 +122,14 @@ def ard_to_ts(
         ard_params,
         pol
 ):
-
     # get the burst directory
     burst_dir = opj(processing_dir, burst)
 
     # check routine if timeseries has already been processed
-    check_file = opj(burst_dir, 'Timeseries', '.{}.{}.processed'.format(product, pol))
+    check_file = opj(burst_dir,
+                     'Timeseries',
+                     '.{}.{}.processed'.format(product, pol)
+                     )
     if os.path.isfile(check_file):
         logger.debug(
                      'INFO: Timeseries of {} for {} in {} polarisation already'
@@ -132,17 +137,14 @@ def ard_to_ts(
                      )
         return
 
-    ard = ard_params
-    ard_mt = ard_params
-
     # get the db scaling right
-    to_db = ard['to_db']
+    to_db = ard_params['to_db']
     if to_db or product is not 'BS':
         to_db = False
     else:
-        to_db = ard_mt['to_db']
+        to_db = ard_params['to_db']
 
-    if ard['apply_ls_mask']:
+    if ard_params['apply_ls_mask']:
         extent = opj(burst_dir, '{}.extent.masked.shp'.format(burst))
     else:
         extent = opj(burst_dir, '{}.extent.shp'.format(burst))
@@ -185,7 +187,7 @@ def ard_to_ts(
             create_stack(list_of_files, temp_stack, stack_log, polarisation=pol)
 
         # run mt speckle filter
-        if ard_mt['mt_speckle_filter'] is True:
+        if ard_params['mt_speckle_filter'] is True:
             speckle_log = opj(out_dir, '{}_{}_{}_mt_speckle.err_log'.format(
                 burst, product, pol))
 
@@ -193,8 +195,6 @@ def ard_to_ts(
             mt_speckle_filter('{}.dim'.format(temp_stack),
                               out_stack, speckle_log
                               )
-            # remove tmp files
-            h.delete_dimap(temp_stack)
         else:
             out_stack = temp_stack
 
@@ -235,7 +235,7 @@ def ard_to_ts(
 
             ras.mask_by_shape(infile, outfile, extent,
                               to_db=to_db,
-                              datatype=ard_mt['dtype output'],
+                              datatype=ard_params['dtype output'],
                               min_value=mm_dict[stretch]['min'],
                               max_value=mm_dict[stretch]['max'],
                               ndv=0.0,
@@ -262,34 +262,29 @@ def ard_to_ts(
             out_date = datetime.datetime.strftime(in_date, '%y%m%d')
 
             infile = glob.glob(opj('{}.data'.format(out_stack),
-                                   '*{}*{}*img'.format(pol, date)))[0]
-
+                                   '*{}*{}*img'.format(pol, date))
+                               )[0]
             # create outfile
             outfile = opj(out_dir, '{}.{}.{}.{}.tif'.format(
                 i, out_date, product, pol))
 
-            ras.mask_by_shape(infile, outfile, extent,
-                              to_db=to_db,
-                              datatype=ard_mt['dtype output'],
-                              min_value=mm_dict[stretch]['min'],
-                              max_value=mm_dict[stretch]['max'],
-                              ndv=0.0)
+            ras.mask_by_shape(
+                infile,
+                outfile,
+                extent,
+                to_db=to_db,
+                datatype=ard_params['dtype output'],
+                min_value=mm_dict[stretch]['min'],
+                max_value=mm_dict[stretch]['max'],
+                ndv=0.0
+            )
 
             # add ot a list for suBSequent vrt creation
             outfiles.append(outfile)
             i += 1
 
-    for file in outfiles:
-        return_code = h.check_out_tiff(file)
-        if return_code != 0:
-            h.remove_folder_content(temp_dir)
-            os.remove(file)
-            return return_code
-
-    # write file, so we know this ts has been succesfully processed
-    if return_code == 0:
-        with open(str(check_file), 'w') as file:
-            file.write('passed all tests \n')
+    with open(str(check_file), 'w') as file:
+        file.write('passed all tests \n')
 
     # build vrt of timeseries
     vrt_options = gdal.BuildVRTOptions(srcNodata=0, separate=True)
