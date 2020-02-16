@@ -220,8 +220,11 @@ def ards_to_timeseries(
                     'Timeseries',
                     '{}.stack.errLog'.format(p)
                 )
+                if list_of_pols != []:
+                    logger.debug('This polarization is empty!')
+                    continue
                 with TemporaryDirectory() as temp:
-                    if len(list_of_ards) > 1 and len(list_of_pols) > 2:
+                    if len(list_of_ards) > 1 and len(list_of_pols) > 0:
                         # create output stack name for RTC
                         temp_stack = opj(temp, 'stack_{}_{}'.format(track, p))
                         out_stack = opj(temp, 'mt_stack_{}_{}'.format(track, p))
