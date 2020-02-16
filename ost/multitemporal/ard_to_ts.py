@@ -86,7 +86,7 @@ def mt_speckle_filter(
                ' -PsigmaStr={}'
                ' -PtargetWindowSizeStr={}'
                ' -PwindowSize={}'
-               '-t \'{}\' \'{}\''.format(
+               ' -t "{}" "{}"'.format(
         gpt_file, 2 * os.cpu_count(),
         speckle_dict['estimate_ENL'],
         speckle_dict['pan_size'],
@@ -201,7 +201,7 @@ def ard_to_ts(
                 '{}_{}_{}_mt_speckle.err_log'.format(track, product_suffix, pol)
             )
             logger.debug('INFO: Applying multi-temporal speckle filter')
-            mt_speckle_filter('{}*.dim'.format(temp_stack),
+            mt_speckle_filter('{}.dim'.format(temp_stack),
                               out_stack,
                               speckle_log
                               )
