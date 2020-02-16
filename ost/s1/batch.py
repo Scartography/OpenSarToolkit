@@ -221,7 +221,7 @@ def ards_to_timeseries(
                     '{}.stack.errLog'.format(p)
                 )
                 with TemporaryDirectory() as temp:
-                    if len(list_of_ards) > 1:
+                    if len(list_of_ards) > 1 and len(list_of_pols) > 2:
                         # create output stack name for RTC
                         temp_stack = opj(temp, 'stack_{}_{}'.format(track, p))
                         out_stack = opj(temp, 'mt_stack_{}_{}'.format(track, p))
