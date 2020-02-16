@@ -9,6 +9,9 @@ import gdal
 import osr
 import ogr
 import fiona
+import json
+import shutil
+import itertools
 import imageio
 import rasterio
 import rasterio.mask
@@ -377,6 +380,45 @@ def mask_by_shape(
                              BAND_NAME='{}'.format(os.path.basename(infile)[:-4]))
             dest.set_band_description(1,
                                       '{}'.format(os.path.basename(infile)[:-4]))
+
+
+def create_tscan_vrt(timescan_dir, proc_file):
+    # load ard parameters
+    with open(proc_file, 'r') as ard_file:
+        ard_params = json.load(ard_file)['processing parameters']
+        ard_tscan = ard_params['time-scan ARD']
+
+    # loop through all pontial proucts
+    # a products list
+    product_list = ['bs.HH', 'bs.VV', 'bs.HV', 'bs.VH',
+                    'coh.VV', 'coh.VH', 'coh.HH', 'coh.HV',
+                    'pol.Entropy', 'pol.Anisotropy', 'pol.Alpha'
+                    ]
+
+    i, outfiles = 0, []
+    iteration = itertools.product(product_list, ard_tscan['metrics'])
+    for product, metric in iteration:
+
+        # get file and add number for outfile
+        infile = opj(timescan_dir, '{}.{}.tif'.format(product, metric))
+
+        # if there is no file sto the iteration
+        if not os.path.isfile(infile):
+            continue
+
+        # else
+        i += 1
+        outfile = opj(timescan_dir,
+                      '{}.{}.{}.tif'.format(i, product, metric))
+        outfiles.append(outfile)
+        # otherwise rename the file
+        shutil.move(infile, outfile)
+
+    vrt_options = gdal.BuildVRTOptions(srcNodata=0, separate=True)
+    gdal.BuildVRT(opj(timescan_dir, 'Timescan.vrt'.format()),
+                  outfiles,
+                  options=vrt_options
+                  )
 
 
 def norm(band, percentile=False):

@@ -222,8 +222,8 @@ def timeseries_to_timescan(
         ard_tscan = ard_params['time-scan ARD']
 
     # get the db scaling right
-    to_db = ard['to db']
-    if ard['to db'] or ard_mt['to db']:
+    to_db = ard['to_db']
+    if ard['to_db'] or ard_mt['to_db']:
         to_db = True
 
     dtype_conversion = True if ard_mt['dtype output'] != 'float32' else False
@@ -239,22 +239,21 @@ def timeseries_to_timescan(
 
         # loop thorugh each polarization
         for polar in ['VV', 'VH', 'HH', 'HV']:
-
             if os.path.isfile(opj(timescan_dir, '.{}.processed'.format(polar))):
-                logger.debug('INFO: Timescans for track {} already'
-                      ' processed.'.format(track))
+                logger.debug(
+                    'INFO: Timescans for track {} already'
+                    ' processed.'.format(track))
                 continue
-
             # Get timeseries vrt
             timeseries = opj(track_dir,
                              'Timeseries',
                              'Timeseries.bs.{}.vrt'.format(polar)
                              )
-
             if not os.path.isfile(timeseries):
                 continue
-
-            logger.debug('INFO: Processing Timescans of {} for track {}.'.format(polar, track))
+            logger.debug(
+                'INFO: Processing Timescans of {} for track {}.'.format(polar, track)
+            )
             # create a datelist for harmonics
             scenelist = glob.glob(
                 opj(track_dir, '*bs.{}.tif'.format(polar))
