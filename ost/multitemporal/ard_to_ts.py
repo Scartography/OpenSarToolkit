@@ -208,7 +208,7 @@ def ard_to_ts(
                               )
         else:
             out_stack = temp_stack
-
+        outfile = None
         if product_suffix == 'coh':
             # get slave and master Date
             master_dates = [datetime.datetime.strptime(
@@ -291,6 +291,9 @@ def ard_to_ts(
                 # add ot a list for subsequent vrt creation
                 outfiles.append(outfile)
                 i += 1
+
+        if outfile is None or not os.path.isfile(outfile):
+            raise RuntimeError('File %s was not created, something went wrong.', outfile)
 
         with open(str(check_file), 'w') as file:
             file.write('passed all tests \n')
