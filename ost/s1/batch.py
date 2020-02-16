@@ -266,35 +266,37 @@ def ards_to_timeseries(
                             datetime.datetime.strptime(x.split('_')[-1][:-4], '%d%b%Y')
                             for x in glob.glob(opj('{}.data'.format(out_stack), '*img'))
                         ]
-
                     else:
-                        out_stack = list_of_ards[0]
+                        out_stack = list_of_ards[0].replace('.dim', '')
                         dates = [
                             datetime.datetime.strptime(
                                 os.path.basename(string_of_ards).split('_')[0], '%Y%m%d'
                             )
                         ]
-                    # sort them
-                    dates.sort()
-                    # write them back to string for following loop
-                    sorted_dates = [
-                        datetime.datetime.strftime(ts, "%d%b%Y") for ts in dates
-                    ]
+
                     i, outfiles = 1, []
-                    for date in sorted_dates:
+                    dates.sort()
+                    for date in dates:
                         # restructure date to YYMMDD
-                        indate = datetime.datetime.strptime(date, '%d%b%Y')
-                        outdate = datetime.datetime.strftime(indate, '%y%m%d')
-                        infile = glob.glob(
-                            opj('{}.data'.format(out_stack),
-                                '*{}*{}*img'.format(p, date)
-                                )
-                        )[0]
+                        date_string = datetime.datetime.strftime(date, '%Y%m%d')
+                        try:
+                            infile = glob.glob(
+                                opj('{}.data'.format(out_stack),
+                                    '*{}*{}*img'.format(p, date_string)
+                                    )
+                            )[0]
+                        except:
+                            infile = glob.glob(
+                                opj('{}.data'.format(out_stack),
+                                    '*{}*{}*img'.format(date_string, p)
+                                    )
+                            )[0]
+                        os.path.isfile(infile)
                         # create outFile
                         outfile = opj(
                             track_dir,
                             'Timeseries',
-                            '{}.{}.BS.{}.tif'.format(i, outdate, p)
+                            '{}.{}.BS.{}.tif'.format(i, date_string, p)
                         )
                         # mask by extent
                         ras.mask_by_shape(
