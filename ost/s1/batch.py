@@ -209,19 +209,17 @@ def ards_to_timeseries(
                 vec.difference(extent, '{}.shp'.format(out_ls[:-4]), extent_ls_masked)
                 extent = extent_ls_masked
 
+            os.makedirs(opj(track_dir, 'Timeseries'), exist_ok=True)
             for p in ['VV', 'VH', 'HH', 'HV']:
                 # check if polarisation is existent
                 list_of_pols = sorted(
                     glob.glob(opj(track_dir, '20*', '*TC*data', '*{}*.img'.format(p)))
                 )
-
-                os.makedirs(opj(track_dir, 'Timeseries'), exist_ok=True)
                 logfile = opj(
                     track_dir,
                     'Timeseries',
                     '{}.stack.errLog'.format(p)
                 )
-
                 with TemporaryDirectory() as temp:
                     if len(list_of_ards) > 1:
                         # create output stack name for RTC
@@ -245,8 +243,10 @@ def ards_to_timeseries(
                             # do the multi-temporal filtering
                             logfile = opj(track_dir, 'Timeseries',
                                           '{}.mt_speckle_filter.errLog'.format(p))
-                            return_code = ts.mt_speckle_filter('{}.dim'.format(
-                                temp_stack), out_stack, logfile
+                            return_code = ts.mt_speckle_filter(
+                                '{}.dim'.format(temp_stack),
+                                out_stack,
+                                logfile
                             )
                             if return_code != 0:
                                 logger.debug(
@@ -258,26 +258,34 @@ def ards_to_timeseries(
                             h.delete_dimap(temp_stack)
                         else:
                             out_stack = temp_stack
+                        # get the dates of the files
+                        dates = [
+                            datetime.datetime.strptime(x.split('_')[-1][:-4], '%d%b%Y')
+                            for x in glob.glob(opj('{}.data'.format(out_stack), '*img'))
+                        ]
+                        # sort them
+                        dates.sort()
+                        # write them back to string for following loop
+                        sorted_dates = [
+                            datetime.datetime.strftime(ts, "%d%b%Y") for ts in dates
+                        ]
+                        out_stack_data = os.path.basename(out_stack).replace('dim', '')
                     else:
-                        out_stack = string_of_ards
-
-                    # get the dates of the files
-                    dates = [datetime.datetime.strptime(x.split('_')[-1][:-4], '%d%b%Y')
-                             for x in glob.glob(opj('{}.data'.format(out_stack), '*img'))
-                             ]
-                    # sort them
-                    dates.sort()
-                    # write them back to string for following loop
-                    sorted_dates = [
-                        datetime.datetime.strftime(ts, "%d%b%Y") for ts in dates
-                    ]
+                        sorted_dates = [
+                            datetime.datetime.strptime(
+                                os.path.basename(string_of_ards).split('_')[0], '%Y%m%d'
+                            )
+                        ]
+                        out_stack_data = os.path.basename(string_of_ards).replace('dim',
+                                                                                  ''
+                                                                                  )
                     i, outfiles = 1, []
                     for date in sorted_dates:
                         # restructure date to YYMMDD
                         indate = datetime.datetime.strptime(date, '%d%b%Y')
                         outdate = datetime.datetime.strftime(indate, '%y%m%d')
                         infile = glob.glob(
-                            opj('{}.data'.format(out_stack),
+                            opj('{}.data'.format(out_stack_data),
                                 '*{}*{}*img'.format(p, date)
                                 )
                         )[0]
@@ -310,8 +318,6 @@ def ards_to_timeseries(
                         outfiles,
                         options=vrt_options
                     )
-                    # delete stack as it is not nessesary anymore, tifs in place
-                    h.delete_dimap(out_stack)
 
             # write file, so we know this ts has been succesfully processed
             check_file = opj(track_dir, 'Timeseries', '.processed')
