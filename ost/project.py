@@ -569,7 +569,7 @@ class Sentinel1Batch(Sentinel1):
             self.ard_parameters['create_ls_mask'] = False
             # timescan specific
             self.ard_parameters['metrics'] = ARD_TIMESCAN_METRICS
-            self.ard_parameters['outlier_removal'] = True
+            self.ard_parameters['remove_outliers'] = True
         elif ard_type == 'OST_flat':
             self.ard_parameters['type'] = ard_type
             self.ard_parameters['resolution'] = 20
@@ -589,7 +589,7 @@ class Sentinel1Batch(Sentinel1):
             self.ard_parameters['create_ls_mask'] = False
             # timescan specific
             self.ard_parameters['metrics'] = ARD_TIMESCAN_METRICS
-            self.ard_parameters['outlier_removal'] = True
+            self.ard_parameters['remove_outliers'] = True
         elif ard_type == 'CEOS':
             self.ard_parameters['type'] = ard_type
             self.ard_parameters['resolution'] = 10
@@ -609,7 +609,7 @@ class Sentinel1Batch(Sentinel1):
             self.ard_parameters['create_ls_mask'] = False
             # timescan specific
             self.ard_parameters['metrics'] = ARD_TIMESCAN_METRICS
-            self.ard_parameters['outlier_removal'] = False
+            self.ard_parameters['remove_outliers'] = False
         elif ard_type == 'EarthEngine':
             self.ard_parameters['type'] = ard_type
             self.ard_parameters['resolution'] = 10
@@ -628,7 +628,7 @@ class Sentinel1Batch(Sentinel1):
             self.ard_parameters['apply_ls_mask'] = False
             # timescan specific
             self.ard_parameters['metrics'] = ARD_TIMESCAN_METRICS
-            self.ard_parameters['outlier_removal'] = False
+            self.ard_parameters['remove_outliers'] = False
         elif ard_type == 'Zhuo':
             self.ard_parameters['type'] = ard_type
             self.ard_parameters['resolution'] = 25
@@ -647,4 +647,4 @@ class Sentinel1Batch(Sentinel1):
             self.ard_parameters['create_ls_mask'] = False
             # timescan specific
             self.ard_parameters['metrics'] = ARD_TIMESCAN_METRICS
-            self.ard_parameters['outlier_removal'] = False
+            self.ard_parameters['remove_outliers'] = False

@@ -206,25 +206,16 @@ def ards_to_timeseries(
 
 
 def timeseries_to_timescan(
-        inventory_df, 
+        inventory_df,
         processing_dir,
-        proc_file,
-        exec_file=None
+        ard_params=None
 ):
-
-    # load ard parameters
-    with open(proc_file, 'r') as ard_file:
-        ard_params = json.load(ard_file)['processing parameters']
-        ard = ard_params['single ARD']
-        ard_mt = ard_params['time-series ARD']
-        ard_tscan = ard_params['time-scan ARD']
-
     # get the db scaling right
-    to_db = ard['to_db']
-    if ard['to_db'] or ard_mt['to_db']:
+    to_db = ard_params['to_db']
+    if ard_params['to_db'] or ard_params['to_db']:
         to_db = True
 
-    dtype_conversion = True if ard_mt['dtype output'] != 'float32' else False
+    dtype_conversion = True if ard_params['dtype_output'] != 'float32' else False
 
     for track in inventory_df.relativeorbit.unique():
 
@@ -263,27 +254,18 @@ def timeseries_to_timescan(
                 datelist.append(os.path.basename(file).split('.')[1])
 
             # define timescan prefix
-            timescan_prefix = opj(timescan_dir, 'BS.{}'.format(polar))
-
-            # placeholder for parallel execution
-            if exec_file:
-                logger.debug(' Write command to a text file')
-                continue
+            timescan_prefix = opj(timescan_dir, 'TC.{}'.format(polar))
 
             # run timescan
             timescan.mt_metrics(
                 timeseries,
                 timescan_prefix,
-                ard_tscan['metrics'],
+                ard_params['metrics'],
                 rescale_to_datatype=dtype_conversion,
                 to_power=to_db,
-                outlier_removal=ard_tscan['remove outliers'],
+                outlier_removal=ard_params['remove_outliers'],
                 datelist=datelist
             )
-
-        if not exec_file:
-            # create vrt file (and rename )
-            ras.create_tscan_vrt(timescan_dir, proc_file)
 
 
 def mosaic_timeseries(

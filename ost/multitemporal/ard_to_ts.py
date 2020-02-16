@@ -151,7 +151,7 @@ def ard_to_ts(
         extent = opj(track_dir, '{}.extent.shp'.format(track))
 
     # min max dict for stretching in case of 16 or 8 bit datatype
-    mm_dict = {'BS': {'min': -30, 'max': 5},
+    mm_dict = {'TC': {'min': -30, 'max': 5},
                'coh': {'min': 0.000001, 'max': 1},
                'Alpha': {'min': 0.000001, 'max': 90},
                'Anisotropy': {'min': 0.000001, 'max': 1},
@@ -241,7 +241,12 @@ def ard_to_ts(
 
                 outfile = opj(
                     out_dir,
-                    '{}.{}.{}.{}.{}.tif'.format(i, out_master, out_slave, product_suffix, pol)
+                    '{}.{}.{}.{}.{}.tif'.format(i,
+                                                out_master,
+                                                out_slave,
+                                                product_suffix,
+                                                pol
+                                                )
                               )
 
                 ras.mask_by_shape(infile, outfile, extent,
