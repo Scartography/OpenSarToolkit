@@ -76,7 +76,12 @@ from ost.settings import OST_ROOT
 logger = logging.getLogger(__name__)
 
 
-def _grd_frame_import(infile, outfile, logfile, polarisation='VV,VH,HH,HV'):
+def _grd_frame_import(
+        infile,
+        outfile,
+        logfile,
+        polarisation='VV,VH,HH,HV'
+):
     '''A wrapper of SNAP import of a single Sentinel-1 GRD product
 
     This function takes an original Sentinel-1 scene (either zip or
@@ -106,8 +111,8 @@ def _grd_frame_import(infile, outfile, logfile, polarisation='VV,VH,HH,HV'):
     graph = opj(OST_ROOT, 'graphs', 'S1_GRD2ARD', '1_AO_TNR.xml')
 
     # construct command
-    command = '{} {} -x -q {} -Pinput=\'{}\' -Ppolarisation={} \
-               -Poutput=\'{}\''.format(
+    command = '{} {} -x -q {} -Pinput="{}" -Ppolarisation={} \
+               -Poutput="{}"'.format(
         gpt_file, graph, 2 * os.cpu_count(), infile, polarisation, outfile)
 
     # run command
@@ -117,15 +122,19 @@ def _grd_frame_import(infile, outfile, logfile, polarisation='VV,VH,HH,HV'):
     if return_code == 0:
         logger.debug('INFO: Succesfully imported product')
     else:
-        logger.debug('ERROR: Frame import exited with an error. \
-                See {} for Snap Error output'.format(logfile))
-        sys.exit(102)
-
+        raise RuntimeError('ERROR: Frame import exited with an error. \
+                See {} for Snap Error output'.format(logfile)
+                           )
     return return_code
 
 
-def _grd_frame_import_subset(infile, outfile, georegion,
-                             logfile, polarisation='VV,VH,HH,HV'):
+def _grd_frame_import_subset(
+        infile,
+        outfile,
+        georegion,
+        logfile,
+        polarisation='VV,VH,HH,HV'
+):
     '''A wrapper of SNAP import of a subset of single Sentinel-1 GRD product
 
     This function takes an original Sentinel-1 scene (either zip or
@@ -161,8 +170,8 @@ def _grd_frame_import_subset(infile, outfile, georegion,
     graph = opj(OST_ROOT, 'graphs', 'S1_GRD2ARD', '1_AO_TNR_SUB.xml')
 
     # construct command
-    command = '{} {} -x -q {} -Pinput=\'{}\' -Pregion=\'{}\' -Ppolarisation={} \
-                      -Poutput=\'{}\''.format(
+    command = '{} {} -x -q {} -Pinput="{}" -Pregion="{}" -Ppolarisation={} \
+                      -Poutput="{}"'.format(
         gpt_file, graph, 2 * os.cpu_count(),
         infile, georegion, polarisation, outfile)
 
@@ -173,10 +182,9 @@ def _grd_frame_import_subset(infile, outfile, georegion,
     if return_code == 0:
         logger.debug('INFO: Succesfully imported product')
     else:
-        logger.debug('ERROR: Frame import exited with an error. \
-                See {} for Snap Error output'.format(logfile))
-        sys.exit(102)
-
+        raise RuntimeError('ERROR: Frame import exited with an error. \
+                See {} for Snap Error output'.format(logfile)
+                           )
     return return_code
 
 
@@ -766,7 +774,6 @@ def _grd_ls_mask(
         logger.debug('ERROR: Layover/Shadow mask creation exited with an error. \
                 See {} for Snap Error output'.format(logfile))
         raise RuntimeError
-        sys.exit(112)
     return return_code
 
 
@@ -879,19 +886,24 @@ def grd_to_ard(filelist,
         logfile = opj(output_dir, '{}_Import.errLog'.format(out_prefix))
 
         if subset is None:
-            return_code = _grd_frame_import(filelist[0], grd_import, logfile,
-                                            polarisation)
+            return_code = _grd_frame_import(filelist[0],
+                                            grd_import,
+                                            logfile,
+                                            polarisation
+                                            )
         else:
-            # georegion = vec.shp_to_wkt(subset, buffer=0.1, envelope=True)
-            return_code = _grd_frame_import_subset(filelist[0], grd_import,
-                                                   subset, logfile,
-                                                   polarisation)
+            return_code = _grd_frame_import_subset(filelist[0],
+                                                   grd_import,
+                                                   subset,
+                                                   logfile,
+                                                   polarisation
+                                                   )
         if return_code != 0:
             h.remove_folder_content(temp_dir)
             return return_code
+
     # ---------------------------------------------------------------------
     # Remove the grd border noise from existent channels (OST routine)
-
     if border_noise and not subset:
         for polarisation in ['VV', 'VH', 'HH', 'HV']:
 

@@ -700,6 +700,8 @@ class Sentinel1Scene:
                              )
             out_prefix = out_prefix.replace(' ', '_')
             with TemporaryDirectory(dir=temp_dir) as temp:
+                if isinstance(filelist, str):
+                    filelist = [filelist]
                 # run the processing
                 return_code = grd_to_ard(
                     filelist,

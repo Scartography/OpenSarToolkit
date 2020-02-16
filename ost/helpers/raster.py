@@ -328,17 +328,24 @@ def mask_by_shape(
         rescale=True,
         min_value=0.000001,
         max_value=1,
-        ndv=None
+        ndv=None,
+        description=True
 ):
+
     # import shapefile geometries
     with fiona.open(shapefile, 'r') as file:
         features = [feature['geometry'] for feature in file
                     if feature['geometry']]
+
     # import raster
     with rasterio.open(infile) as src:
         out_image, out_transform = rasterio.mask.mask(src, features, crop=True)
         out_meta = src.meta.copy()
         out_image = np.ma.masked_where(out_image == ndv, out_image)
+
+    # unmask array
+    out_image = out_image.data
+
     # if to decibel should be applied
     if to_db is True:
         out_image = convert_to_db(out_image)
@@ -352,45 +359,24 @@ def mask_by_shape(
             elif datatype == 'uint16':
                 out_image = scale_to_int(out_image, min_value, max_value, 'uint16')
 
-    out_meta.update({'driver': 'GTiff', 'height': out_image.shape[1],
-                     'width': out_image.shape[2], 'transform': out_transform,
-                     'nodata': ndv, 'dtype': datatype, 'tiled': True,
-                     'blockxsize': 128, 'blockysize': 128})
+    out_meta.update({'driver': 'GTiff',
+                     'height': out_image.shape[1],
+                     'width': out_image.shape[2],
+                     'transform': out_transform,
+                     'nodata': ndv,
+                     'dtype': datatype,
+                     'tiled': True,
+                     'blockxsize': 128,
+                     'blockysize': 128
+                     })
 
     with rasterio.open(outfile, 'w', **out_meta) as dest:
-        dest.write(out_image.filled(ndv))
-
-
-# the outlier removal, needs revision (e.g. use something profound)
-def outlier_removal(
-        arrayin,
-        stddev=3
-):
-    # calculate percentiles
-    perc95 = np.percentile(arrayin, 95, axis=0)
-    perc5 = np.percentile(arrayin, 5, axis=0)
-
-    # we mask out the percetile outliers for std dev calculation
-    masked_array = np.ma.MaskedArray(
-        arrayin,
-        mask=np.logical_or(
-            arrayin > perc95,
-            arrayin < perc5
-            )
-        )
-    # we calculate new std and mean
-    masked_std = np.std(masked_array, axis=0)
-    masked_mean = np.mean(masked_array, axis=0)
-
-    # we mask based on mean +- 3 * stddev
-    array_out = np.ma.MaskedArray(
-        arrayin,
-        mask=np.logical_or(
-            arrayin > masked_mean + masked_std * stddev,
-            arrayin < masked_mean - masked_std * stddev,
-            )
-        )
-    return array_out
+        dest.write(out_image)
+        if description:
+            dest.update_tags(1,
+                             BAND_NAME='{}'.format(os.path.basename(infile)[:-4]))
+            dest.set_band_description(1,
+                                      '{}'.format(os.path.basename(infile)[:-4]))
 
 
 def norm(band, percentile=False):

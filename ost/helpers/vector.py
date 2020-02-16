@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 from functools import partial
 
 import ogr
@@ -353,6 +354,14 @@ def buffer_shape(infile, outfile, buffer=None):
                     'geometry': mapping(
                         shape(point['geometry']).buffer(buffer))
                 })
+
+
+def gdf_to_json_geometry(gdf):
+    """Function to parse features from GeoDataFrame in such a manner
+       that rasterio wants them"""
+    geojson = json.loads(gdf.to_json())
+    return [feature['geometry'] for feature in geojson['features']
+            if feature['geometry']]
 
 
 def plot_inventory(aoi, inventory_df, transperancy=0.05, show=False):
