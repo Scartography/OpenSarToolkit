@@ -1,14 +1,14 @@
 
 DEFAULT_SPECKLE_DICT = {
     "filter": "Refined Lee",
-    "ENL": '',
-    "estimate_ENL": '',
-    "sigma": '',
-    "filter_x_size": '',
-    "filter_y_size": '',
-    "window_size": '',
-    "target_window_size": '',
-    "num_of_looks": '',
-    "damping": '',
-    "pan_size": ''
+    "ENL": 1.0,
+    "estimate_ENL": 'true',
+    "sigma": 0.9,
+    "filter_x_size": 3,
+    "filter_y_size": 3,
+    "window_size": "7x7",
+    "target_window_size": "3x3",
+    "num_of_looks": 1,
+    "damping": 2,
+    "pan_size": 50
 }
