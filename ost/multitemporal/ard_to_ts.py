@@ -118,9 +118,9 @@ def ard_to_ts(
         list_of_files,
         processing_dir,
         burst,
-        product,
         ard_params,
-        pol
+        pol,
+        product_suffix='TC'
 ):
     # get the burst directory
     burst_dir = opj(processing_dir, burst)
@@ -128,18 +128,18 @@ def ard_to_ts(
     # check routine if timeseries has already been processed
     check_file = opj(burst_dir,
                      'Timeseries',
-                     '.{}.{}.processed'.format(product, pol)
+                     '.{}.{}.processed'.format(product_suffix, pol)
                      )
     if os.path.isfile(check_file):
         logger.debug(
                      'INFO: Timeseries of {} for {} in {} polarisation already'
-                     ' processed'.format(burst, product, pol)
+                     ' processed'.format(burst, product_suffix, pol)
                      )
         return
 
     # get the db scaling right
     to_db = ard_params['to_db']
-    if to_db or product is not 'BS':
+    if to_db or product_suffix is not 'BS':
         to_db = False
     else:
         to_db = ard_params['to_db']
@@ -157,7 +157,7 @@ def ard_to_ts(
                'Entropy': {'min': 0.000001, 'max': 1}
                }
 
-    stretch = pol if pol in ['Alpha', 'Anisotropy', 'Entropy'] else product
+    stretch = pol if pol in ['Alpha', 'Anisotropy', 'Entropy'] else product_suffix
 
     # define out_dir for stacking routine
     out_dir = opj(processing_dir, '{}'.format(burst), 'Timeseries')
@@ -165,9 +165,15 @@ def ard_to_ts(
 
     with TemporaryDirectory() as temp_dir:
         # create namespaces
-        temp_stack = opj(temp_dir, '{}_{}_{}'.format(burst, product, pol))
-        out_stack = opj(temp_dir, '{}_{}_{}_mt'.format(burst, product, pol))
-        stack_log = opj(out_dir, '{}_{}_{}_stack.err_log'.format(burst, product, pol))
+        temp_stack = opj(
+            temp_dir, '{}_{}_{}'.format(burst, product_suffix, pol)
+        )
+        out_stack = opj(
+            temp_dir, '{}_{}_{}_mt'.format(burst, product_suffix, pol)
+        )
+        stack_log = opj(
+            out_dir, '{}_{}_{}_stack.err_log'.format(burst, product_suffix, pol)
+        )
 
         # run stacking routines
         # convert list of files readable for snap
@@ -183,114 +189,113 @@ def ard_to_ts(
         else:
             logger.debug(
                 'INFO: Creating multi-temporal stack of images of burst/track {} for'
-                ' {} product in {} polarization.'.format(burst, product, pol))
+                ' {} product_suffix in {} polarization.'.format(burst, product_suffix, pol))
             create_stack(list_of_files, temp_stack, stack_log, polarisation=pol)
 
         # run mt speckle filter
         if ard_params['mt_speckle_filter'] is True:
-            speckle_log = opj(out_dir, '{}_{}_{}_mt_speckle.err_log'.format(
-                burst, product, pol))
+            speckle_log = opj(
+                out_dir,
+                '{}_{}_{}_mt_speckle.err_log'.format(burst, product_suffix, pol)
+            )
 
-            logger.debug(' INFO: Applying multi-temporal speckle filter')
+            logger.debug('INFO: Applying multi-temporal speckle filter')
             mt_speckle_filter('{}.dim'.format(temp_stack),
-                              out_stack, speckle_log
+                              out_stack,
+                              speckle_log
                               )
         else:
             out_stack = temp_stack
 
-    if product == 'coh':
-        # get slave and master Date
-        master_dates = [datetime.datetime.strptime(
-            os.path.basename(x).split('_')[3].split('.')[0],
-            '%d%b%Y') for x in glob.glob(
-            opj('{}.data'.format(out_stack), '*img'))]
+        if product_suffix == 'coh':
+            # get slave and master Date
+            master_dates = [datetime.datetime.strptime(
+                os.path.basename(x).split('_')[3].split('.')[0],
+                '%d%b%Y') for x in glob.glob(
+                opj('{}.data'.format(out_stack), '*img'))]
 
-        slaves_dates = [datetime.datetime.strptime(
-            os.path.basename(x).split('_')[4].split('.')[0],
-            '%d%b%Y') for x in glob.glob(
-            opj('{}.data'.format(out_stack), '*img'))]
-        # sort them
-        master_dates.sort()
-        slaves_dates.sort()
-        # write them back to string for following loop
-        sorted_master_dates = [datetime.datetime.strftime(
-            ts, "%d%b%Y") for ts in master_dates]
-        sorted_slave_dates = [datetime.datetime.strftime(
-            ts, "%d%b%Y") for ts in slaves_dates]
+            slaves_dates = [datetime.datetime.strptime(
+                os.path.basename(x).split('_')[4].split('.')[0],
+                '%d%b%Y') for x in glob.glob(
+                opj('{}.data'.format(out_stack), '*img'))]
+            # sort them
+            master_dates.sort()
+            slaves_dates.sort()
+            # write them back to string for following loop
+            sorted_master_dates = [datetime.datetime.strftime(
+                ts, "%d%b%Y") for ts in master_dates]
+            sorted_slave_dates = [datetime.datetime.strftime(
+                ts, "%d%b%Y") for ts in slaves_dates]
 
-        i, outfiles = 1, []
-        for mst, slv in zip(sorted_master_dates, sorted_slave_dates):
-            in_master = datetime.datetime.strptime(mst, '%d%b%Y')
-            in_slave = datetime.datetime.strptime(slv, '%d%b%Y')
+            i, outfiles = 1, []
+            for mst, slv in zip(sorted_master_dates, sorted_slave_dates):
+                in_master = datetime.datetime.strptime(mst, '%d%b%Y')
+                in_slave = datetime.datetime.strptime(slv, '%d%b%Y')
 
-            out_master = datetime.datetime.strftime(in_master, '%y%m%d')
-            out_slave = datetime.datetime.strftime(in_slave, '%y%m%d')
-            infile = glob.glob(opj('{}.data'.format(out_stack),
-                                   '*{}*{}_{}*img'.format(pol, mst, slv)))[0]
+                out_master = datetime.datetime.strftime(in_master, '%y%m%d')
+                out_slave = datetime.datetime.strftime(in_slave, '%y%m%d')
+                infile = glob.glob(opj('{}.data'.format(out_stack),
+                                       '*{}*{}_{}*img'.format(pol, mst, slv)))[0]
 
-            outfile = opj(
-                out_dir,
-                '{}.{}.{}.{}.{}.tif'.format(i, out_master, out_slave, product, pol)
-                          )
-
-            ras.mask_by_shape(infile, outfile, extent,
-                              to_db=to_db,
-                              datatype=ard_params['dtype output'],
-                              min_value=mm_dict[stretch]['min'],
-                              max_value=mm_dict[stretch]['max'],
-                              ndv=0.0,
-                              description=True
+                outfile = opj(
+                    out_dir,
+                    '{}.{}.{}.{}.{}.tif'.format(i, out_master, out_slave, product_suffix, pol)
                               )
-            # add ot a list for suBSequent vrt creation
-            outfiles.append(outfile)
-            i += 1
-    else:
-        # get the dates of the files
-        dates = [datetime.datetime.strptime(x.split('_')[-1][:-4], '%d%b%Y')
-                 for x in glob.glob(opj('{}.data'.format(out_stack), '*img'))]
-        # sort them
-        dates.sort()
-        # write them back to string for following loop
-        sorted_date = [datetime.datetime.strftime(ts, "%d%b%Y")
-                       for ts in dates]
 
-        i, outfiles = 1, []
-        for date in sorted_date:
+                ras.mask_by_shape(infile, outfile, extent,
+                                  to_db=to_db,
+                                  datatype=ard_params['dtype output'],
+                                  min_value=mm_dict[stretch]['min'],
+                                  max_value=mm_dict[stretch]['max'],
+                                  ndv=0.0,
+                                  description=True
+                                  )
+                # add ot a list for suBSequent vrt creation
+                outfiles.append(outfile)
+                i += 1
+        else:
+            # get the dates of the files
+            dates = [datetime.datetime.strptime(x.split('_')[-1][:-4], '%d%b%Y')
+                     for x in glob.glob(opj('{}.data'.format(out_stack), '*img'))]
+            # sort them
+            dates.sort()
+            # write them back to string for following loop
+            sorted_date = [datetime.datetime.strftime(ts, "%d%b%Y")
+                           for ts in dates]
 
-            # restructure date to YYMMDD
-            in_date = datetime.datetime.strptime(date, '%d%b%Y')
-            out_date = datetime.datetime.strftime(in_date, '%y%m%d')
+            i, outfiles = 1, []
+            for date in sorted_date:
+                # restructure date to YYMMDD
+                in_date = datetime.datetime.strptime(date, '%d%b%Y')
+                out_date = datetime.datetime.strftime(in_date, '%y%m%d')
 
-            infile = glob.glob(opj('{}.data'.format(out_stack),
-                                   '*{}*{}*img'.format(pol, date))
-                               )[0]
-            # create outfile
-            outfile = opj(out_dir, '{}.{}.{}.{}.tif'.format(
-                i, out_date, product, pol))
+                infile = glob.glob(opj('{}.data'.format(out_stack),
+                                       '*{}*{}*img'.format(pol, date))
+                                   )[0]
+                # create outfile
+                outfile = opj(out_dir, '{}.{}.{}.{}.tif'.format(
+                    i, out_date, product_suffix, pol))
 
-            ras.mask_by_shape(
-                infile,
-                outfile,
-                extent,
-                to_db=to_db,
-                datatype=ard_params['dtype output'],
-                min_value=mm_dict[stretch]['min'],
-                max_value=mm_dict[stretch]['max'],
-                ndv=0.0
-            )
+                ras.mask_by_shape(
+                    infile,
+                    outfile,
+                    extent,
+                    to_db=to_db,
+                    datatype=ard_params['dtype output'],
+                    min_value=mm_dict[stretch]['min'],
+                    max_value=mm_dict[stretch]['max'],
+                    ndv=0.0
+                )
+                # add ot a list for subsequent vrt creation
+                outfiles.append(outfile)
+                i += 1
 
-            # add ot a list for suBSequent vrt creation
-            outfiles.append(outfile)
-            i += 1
+        with open(str(check_file), 'w') as file:
+            file.write('passed all tests \n')
 
-    with open(str(check_file), 'w') as file:
-        file.write('passed all tests \n')
-
-    # build vrt of timeseries
-    vrt_options = gdal.BuildVRTOptions(srcNodata=0, separate=True)
-    gdal.BuildVRT(opj(out_dir, 'Timeseries.{}.{}.vrt'.format(product, pol)),
-                  outfiles,
-                  options=vrt_options)
-
-    # remove tmp files
-    h.delete_dimap(out_stack)
+        # build vrt of timeseries
+        vrt_options = gdal.BuildVRTOptions(srcNodata=0, separate=True)
+        gdal.BuildVRT(opj(out_dir, 'Timeseries.{}.{}.vrt'.format(product_suffix, pol)),
+                      outfiles,
+                      options=vrt_options
+                      )
