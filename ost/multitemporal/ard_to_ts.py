@@ -184,7 +184,7 @@ def ard_to_ts(
             create_stack(list_of_files, temp_stack, stack_log, polarisation=pol)
 
         # run mt speckle filter
-        if ard_mt['remove mt speckle'] is True:
+        if ard_mt['mt_speckle_filter'] is True:
             speckle_log = opj(out_dir, '{}_{}_{}_mt_speckle.err_log'.format(
                 burst, product, pol))
 
