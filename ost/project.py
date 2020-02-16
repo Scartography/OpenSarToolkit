@@ -410,8 +410,7 @@ class Sentinel1Batch(Sentinel1):
                 self.download_dir,
                 self.processing_dir,
                 self.ard_parameters,
-                subset,
-                self.data_mount
+                subset
             )
             nr_of_processed = len(
                 glob.glob(opj(self.processing_dir, '*', '20*', '.processed'))

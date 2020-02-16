@@ -188,7 +188,11 @@ def _grd_frame_import_subset(
     return return_code
 
 
-def _slice_assembly(filelist, outfile, logfile, polarisation='VV,VH,HH,HV'):
+def _slice_assembly(filelist,
+                    outfile,
+                    logfile,
+                    polarisation='VV,VH,HH,HV'
+                    ):
     '''A wrapper of SNAP's slice assembly routine
 
     This function assembles consecutive frames acquired at the same date.
@@ -845,11 +849,19 @@ def grd_to_ard(filelist,
                 os.path.basename(file)[:-5]))
             logfile = opj(output_dir, '{}_Import.errLog'.format(
                 os.path.basename(file)[:-5]))
-
-            return_code = _grd_frame_import(file, grd_import, logfile)
-            if return_code != 0:
-                h.remove_folder_content(temp_dir)
-                return return_code
+            if subset is not None:
+                grd_subset = opj(temp_dir, '{}_imported_subset'.format(out_prefix))
+                return_code = _grd_subset_georegion('{}.dim'.format(grd_import),
+                                                    grd_subset, logfile, subset
+                                                    )
+                if return_code != 0:
+                    h.remove_folder_content(temp_dir)
+                    return return_code
+            else:
+                return_code = _grd_frame_import(file, grd_import, logfile)
+                if return_code != 0:
+                    h.remove_folder_content(temp_dir)
+                    return return_code
 
         # create list of scenes for full acquisition in
         # preparation of slice assembly
@@ -869,17 +881,8 @@ def grd_to_ard(filelist,
         for file in filelist:
             h.delete_dimap(opj(temp_dir, '{}_imported'.format(
                 os.path.basename(str(file))[:-5])))
-        if subset:
-            grd_subset = opj(temp_dir, '{}_imported_subset'.format(out_prefix))
-            return_code = _grd_subset_georegion('{}.dim'.format(grd_import),
-                                                grd_subset, logfile, subset)
-            if return_code != 0:
-                h.remove_folder_content(temp_dir)
-                return return_code
-
             # delete slice assembly
             h.delete_dimap(grd_import)
-
     # single scene case
     else:
         grd_import = opj(temp_dir, '{}_imported'.format(out_prefix))
