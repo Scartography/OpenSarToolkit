@@ -135,11 +135,11 @@ def ard_to_ts(
     ard_mt = ard_params
 
     # get the db scaling right
-    to_db = ard['to db']
-    if to_db or product is not 'bs':
+    to_db = ard['to_db']
+    if to_db or product is not 'BS':
         to_db = False
     else:
-        to_db = ard_mt['to db']
+        to_db = ard_mt['to_db']
 
     if ard['apply_ls_mask']:
         extent = opj(burst_dir, '{}.extent.masked.shp'.format(burst))
@@ -147,7 +147,7 @@ def ard_to_ts(
         extent = opj(burst_dir, '{}.extent.shp'.format(burst))
 
     # min max dict for stretching in case of 16 or 8 bit datatype
-    mm_dict = {'bs': {'min': -30, 'max': 5},
+    mm_dict = {'BS': {'min': -30, 'max': 5},
                'coh': {'min': 0.000001, 'max': 1},
                'Alpha': {'min': 0.000001, 'max': 90},
                'Anisotropy': {'min': 0.000001, 'max': 1},
@@ -240,7 +240,7 @@ def ard_to_ts(
                               ndv=0.0,
                               description=True
                               )
-            # add ot a list for subsequent vrt creation
+            # add ot a list for suBSequent vrt creation
             outfiles.append(outfile)
             i += 1
     else:
@@ -274,7 +274,7 @@ def ard_to_ts(
                               max_value=mm_dict[stretch]['max'],
                               ndv=0.0)
 
-            # add ot a list for subsequent vrt creation
+            # add ot a list for suBSequent vrt creation
             outfiles.append(outfile)
             i += 1
 

@@ -62,7 +62,7 @@ logger = logging.getLogger(__name__)
 
 
 def _create_processing_dict(inventory_df):
-    '''This function might be obsolete?
+    '''This function might be oBSolete?
 
     '''
 
@@ -196,7 +196,7 @@ def ards_to_timeseries(
 
             # create list of dims if polarisation is present
             list_of_dims = sorted(glob.glob(
-                opj(track_dir, '20*', '*bs*dim')))
+                opj(track_dir, '20*', '*BS*dim')))
             ard_to_ts(
                 list_of_dims,
                 processing_dir,
@@ -247,7 +247,7 @@ def timeseries_to_timescan(
             # Get timeseries vrt
             timeseries = opj(track_dir,
                              'Timeseries',
-                             'Timeseries.bs.{}.vrt'.format(polar)
+                             'Timeseries.BS.{}.vrt'.format(polar)
                              )
             if not os.path.isfile(timeseries):
                 continue
@@ -256,7 +256,7 @@ def timeseries_to_timescan(
             )
             # create a datelist for harmonics
             scenelist = glob.glob(
-                opj(track_dir, '*bs.{}.tif'.format(polar))
+                opj(track_dir, '*BS.{}.tif'.format(polar))
             )
 
             # create a datelist for harmonics calculation
@@ -265,7 +265,7 @@ def timeseries_to_timescan(
                 datelist.append(os.path.basename(file).split('.')[1])
 
             # define timescan prefix
-            timescan_prefix = opj(timescan_dir, 'bs.{}'.format(polar))
+            timescan_prefix = opj(timescan_dir, 'BS.{}'.format(polar))
 
             # placeholder for parallel execution
             if exec_file:
@@ -331,25 +331,30 @@ def mosaic_timeseries(
             start, end = sorted(datelist)[0], sorted(datelist)[-1]
 
             if start == end:
-                outfile = opj(ts_dir, '{}.{}.bs.{}.tif'.format(i, start, p))
+                outfile = opj(ts_dir, '{}.{}.BS.{}.tif'.format(i, start, p))
             else:
-                outfile = opj(ts_dir, '{}.{}-{}.bs.{}.tif'.format(i, start, end, p))
+                outfile = opj(ts_dir, '{}.{}-{}.BS.{}.tif'.format(i, start, end, p))
 
             check_file = opj(
                 os.path.dirname(outfile),
                 '.{}.processed'.format(os.path.basename(outfile)[:-4])
             )
-            # logfile = opj(ts_dir, '{}.{}-{}.bs.{}.errLog'.format(i, start, end, p))
-
             outfiles.append(outfile)
 
             if os.path.isfile(check_file):
-                logger.debug('INFO: Mosaic layer {} already'
-                      ' processed.'.format(os.path.basename(outfile)))
+                logger.debug(
+                    'INFO: Mosaic layer {} already'
+                    ' processed.'.format(os.path.basename(outfile))
+                )
                 continue
 
             logger.debug('INFO: Mosaicking layer {}.'.format(os.path.basename(outfile)))
-            mosaic.mosaic(filelist, outfile, temp_dir, cut_to_aoi)
+            mosaic.mosaic(
+                filelist,
+                outfile,
+                temp_dir,
+                cut_to_aoi
+            )
 
         if exec_file:
             logger.debug(' gdalbuildvrt ....command, outfiles')
@@ -389,7 +394,7 @@ def mosaic_timescan(inventory_df, processing_dir, temp_dir, proc_file,
 
         # create a list of files based on polarisation and metric
         filelist = glob.glob(opj(processing_dir, '*', 'Timescan',
-                                 '*bs.{}.{}.tif'.format(polar, metric)
+                                 '*BS.{}.{}.tif'.format(polar, metric)
                                  )
                              )
 
@@ -399,7 +404,7 @@ def mosaic_timescan(inventory_df, processing_dir, temp_dir, proc_file,
 
         # get number
         filelist = ' '.join(filelist)
-        outfile = opj(tscan_dir, 'bs.{}.{}.tif'.format(polar, metric))
+        outfile = opj(tscan_dir, 'BS.{}.{}.tif'.format(polar, metric))
         check_file = opj(
             os.path.dirname(outfile),
             '.{}.processed'.format(os.path.basename(outfile)[:-4])
