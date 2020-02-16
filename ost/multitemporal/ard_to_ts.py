@@ -10,6 +10,7 @@ from tempfile import TemporaryDirectory
 import gdal
 
 from ost.helpers import raster as ras, helpers as h
+from ost.speckle_settings import DEFAULT_SPECKLE_DICT
 
 logger = logging.getLogger(__name__)
 
@@ -55,19 +56,18 @@ def create_stack(
     return return_code
 
 
-def mt_speckle_filter(in_stack, out_stack, logfile, speckle_dict):
+def mt_speckle_filter(
+        in_stack,
+        out_stack,
+        logfile,
+        speckle_dict=None
+):
     '''
     '''
     # get gpt file
     gpt_file = h.gpt_path()
-
-    #    # get path to graph
-    #    rootpath = importlib.util.find_spec('ost').submodule_search_locations[0]
-    #    graph = opj(rootpath, 'graphs', 'S1_TS', '2_MT_Speckle.xml')
-    #
-    #    command = '{} {} -x -q {} -Pinput={} \
-    #                   -Poutput={}'.format(gpt_file, graph, 2 * os.cpu_count(),
-    #                                       in_stack, out_stack)
+    if speckle_dict is None:
+        speckle_dict = DEFAULT_SPECKLE_DICT
 
     logger.debug(' INFO: Applying multi-temporal speckle filtering.')
     # contrcut command string
@@ -85,18 +85,19 @@ def mt_speckle_filter(in_stack, out_stack, logfile, speckle_dict):
                ' -PwindowSize={}'
                '-t \'{}\' \'{}\''.format(
         gpt_file, 2 * os.cpu_count(),
-        speckle_dict['estimate ENL'],
-        speckle_dict['pan size'],
+        speckle_dict['estimate_ENL'],
+        speckle_dict['pan_size'],
         speckle_dict['damping'],
         speckle_dict['ENL'],
         speckle_dict['filter'],
-        speckle_dict['filter x size'],
-        speckle_dict['filter y size'],
-        speckle_dict['num of looks'],
+        speckle_dict['filter_x_size'],
+        speckle_dict['filter_y_size'],
+        speckle_dict['num_of_looks'],
         speckle_dict['sigma'],
-        speckle_dict['target window size'],
-        speckle_dict['window size'],
-        out_stack, in_stack
+        speckle_dict['target_window_size'],
+        speckle_dict['window_size'],
+        out_stack,
+        in_stack
     )
     )
     return_code = h.run_command(command, logfile)
