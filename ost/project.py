@@ -565,7 +565,8 @@ class Sentinel1Batch(Sentinel1):
             self.ard_parameters['mt_speckle_filter'] = True
             self.ard_parameters['to_db_mt'] = True
             self.ard_parameters['datatype'] = 'float32'
-            self.ard_parameters['ls_mask_apply'] = False
+            self.ard_parameters['apply_ls_mask'] = False
+            self.ard_parameters['create_ls_mask'] = False
             # timescan specific
             self.ard_parameters['metrics'] = ARD_TIMESCAN_METRICS
             self.ard_parameters['outlier_removal'] = True
@@ -584,7 +585,8 @@ class Sentinel1Batch(Sentinel1):
             self.ard_parameters['mt_speckle_filter'] = True
             self.ard_parameters['to_db_mt'] = True
             self.ard_parameters['datatype'] = 'float32'
-            self.ard_parameters['ls_mask_apply'] = False
+            self.ard_parameters['apply_ls_mask'] = False
+            self.ard_parameters['create_ls_mask'] = False
             # timescan specific
             self.ard_parameters['metrics'] = ARD_TIMESCAN_METRICS
             self.ard_parameters['outlier_removal'] = True
@@ -598,12 +600,13 @@ class Sentinel1Batch(Sentinel1):
             self.ard_parameters['to_db'] = False
             self.ard_parameters['polarisation'] = 'VV,VH,HH,HV'
             self.ard_parameters['dem'] = 'SRTM 1Sec HGT'
+            self.ard_parameters['resampling'] = SNAP_S1_RESAMPLING_METHODS[3]
             # time-series specific
             self.ard_parameters['mt_speckle_filter'] = False
             self.ard_parameters['to_db_mt'] = False
             self.ard_parameters['datatype'] = 'float32'
-            self.ard_parameters['ls_mask_apply'] = False
-            self.ard_parameters['resampling'] = SNAP_S1_RESAMPLING_METHODS[3]
+            self.ard_parameters['apply_ls_mask'] = False
+            self.ard_parameters['create_ls_mask'] = False
             # timescan specific
             self.ard_parameters['metrics'] = ARD_TIMESCAN_METRICS
             self.ard_parameters['outlier_removal'] = False
@@ -622,7 +625,7 @@ class Sentinel1Batch(Sentinel1):
             self.ard_parameters['mt_speckle_filter'] = False
             self.ard_parameters['to_db_mt'] = False
             self.ard_parameters['datatype'] = 'float32'
-            self.ard_parameters['ls_mask_apply'] = False
+            self.ard_parameters['apply_ls_mask'] = False
             # timescan specific
             self.ard_parameters['metrics'] = ARD_TIMESCAN_METRICS
             self.ard_parameters['outlier_removal'] = False
@@ -640,7 +643,8 @@ class Sentinel1Batch(Sentinel1):
             self.ard_parameters['mt_speckle_filter'] = False
             self.ard_parameters['to_db_mt'] = False
             self.ard_parameters['datatype'] = 'float32'
-            self.ard_parameters['ls_mask_apply'] = False
+            self.ard_parameters['apply_ls_mask'] = False
+            self.ard_parameters['create_ls_mask'] = False
             # timescan specific
             self.ard_parameters['metrics'] = ARD_TIMESCAN_METRICS
             self.ard_parameters['outlier_removal'] = False

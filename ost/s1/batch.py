@@ -157,7 +157,7 @@ def ards_to_timeseries(
         with TemporaryDirectory() as temp_dir:
             mt_vec.mt_extent(list_of_scenes, extent, temp_dir, -0.0018)
 
-    if ard_params['create ls mask'] or ard_params['apply ls mask']:
+    if ard_params['create_ls_mask'] or ard_params['apply_ls_mask']:
         for track in inventory_df.relativeorbit.unique():
             # get the burst directory
             track_dir = opj(processing_dir, track)
@@ -178,7 +178,7 @@ def ards_to_timeseries(
                     out_ls,
                     temp_dir,
                     extent,
-                    ard_params['apply ls mask']
+                    ard_params['apply_ls_mask']
                 )
 
     for track in inventory_df.relativeorbit.unique():

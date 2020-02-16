@@ -141,7 +141,7 @@ def ard_to_ts(
     else:
         to_db = ard_mt['to db']
 
-    if ard['apply ls mask']:
+    if ard['apply_ls_mask']:
         extent = opj(burst_dir, '{}.extent.masked.shp'.format(burst))
     else:
         extent = opj(burst_dir, '{}.extent.shp'.format(burst))
