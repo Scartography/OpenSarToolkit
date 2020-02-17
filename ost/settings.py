@@ -4,7 +4,9 @@ import inspect
 import logging
 import environs
 import datetime
+
 from ost.errors import OSTConfigError
+from ost.config.speckle_config import *
 
 logger = logging.getLogger(__name__)
 
@@ -62,10 +64,10 @@ class ConfigParam():
 
         if not isinstance(value, self.type):
             raise TypeError(
-                "value must be type %s, not '%s'(%s)"% (self.type, value, type(value))
+                "value must be type %s, not '%s'(%s)" % (self.type, value, type(value))
             )
         if self.choice and value not in self.choice:
-            raise ValueError("value must be one of %s, not %s"% (self.choice, value))
+            raise ValueError("value must be one of %s, not %s" % (self.choice, value))
         return value
 
 
@@ -77,7 +79,7 @@ class ConfigParamGroup():
         self.required = required
 
     def __repr__(self):
-        return "ConfigParamGroup(required=%s, sub_params=%s)"% (
+        return "ConfigParamGroup(required=%s, sub_params=%s)" % (
             self.required, self.sub_params
         )
 
@@ -191,13 +193,6 @@ ARD_TIMESCAN_METRICS = ['avg', 'max', 'min', 'std', 'cov', 'count']
 POLARIZATION_OPTIONS = ['VV', 'VV VH', 'HH', 'HH HV']
 
 DEM_NAMES = ["SRTM 1Sec HGT", "External DEM"]
-
-SPECKLE_FILTERS = ['None', 'Boxcar', 'Median', 'Frost', 'Gamma Map',
-                   'Lee', 'Refined Lee', 'Lee Sigma', 'IDAN'
-                   ]
-SIGMA_LEE = [0.5, 0.6, 0.7, 0.8, 0.9]
-WINDOW_SIZES = ['3x3', '5x5']
-TARGET_WINDOW_SIZES = ['5x5', '7x7', '9x9', '11x11', '13x13', '15x15', '17x17']
 
 SINGLE_ARD_PROCESSING_PARAMETERS = {
     "type": ConfigParam(type=str, default="OST",

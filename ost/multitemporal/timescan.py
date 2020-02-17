@@ -1,15 +1,21 @@
 import os
+import shutil
+import numpy as np
+import logging
+import itertools
 from os.path import join as opj
+from scipy import stats
 
 from datetime import datetime
 from datetime import timedelta
 from calendar import isleap
 
 import rasterio
-import numpy as np
-from scipy import stats
+import gdal
 
 from ost.helpers import raster as ras
+
+logger = logging.getLogger(__name__)
 
 
 def remove_outliers(arrayin, stddev=3, z_threshold=None):
@@ -130,18 +136,23 @@ def nan_percentile(arr, q):
     return result
 
 
-def mt_metrics(stack, out_prefix, metrics, rescale_to_datatype=False,
-               to_power=False, outlier_removal=False, datelist=None):
-
+def mt_metrics(
+        stack,
+        out_prefix,
+        metrics,
+        rescale_to_datatype=False,
+        to_power=False,
+        outlier_removal=False,
+        datelist=None
+):
     # from datetime import datetime
     with rasterio.open(stack) as src:
-
         harmonics = False
         if 'harmonics' in metrics:
-            print(' INFO: Calculating harmonics')
+            logger.debug('INFO: Calculating harmonics')
             if not datelist:
-                print(
-                    ' WARNING: Harmonics need the datelist. '
+                logger.debug(
+                    'WARNING: Harmonics need the datelist. '
                     'Harmonics will not be calculated'
                 )
             else:
@@ -168,9 +179,20 @@ def mt_metrics(stack, out_prefix, metrics, rescale_to_datatype=False,
                 filename, 'w', **meta)
 
         # scaling factors in case we have to rescale to integer
-        minimums = {'avg': -30, 'max': -30, 'min': -30,
-                    'std': 0.00001, 'cov': 0.00001}
-        maximums = {'avg': 5, 'max': 5, 'min': 5, 'std': 15, 'cov': 1}
+        minimums = {'avg': -30,
+                    'max': -30,
+                    'min': -30,
+                    'std': 0.00001,
+                    'cov': 0.00001,
+                    'count': 0
+                    }
+        maximums = {'avg': 5,
+                    'max': 5,
+                    'min': 5,
+                    'std': 15,
+                    'cov': 1,
+                    'count': 64000
+                    }
 
         if harmonics:
             # construct independent variables
@@ -186,11 +208,10 @@ def mt_metrics(stack, out_prefix, metrics, rescale_to_datatype=False,
                 sines.append(np.sin(np.multiply(two_pi, delta - 0.5)))
                 cosines.append(np.cos(np.multiply(two_pi, delta - 0.5)))
 
-            X = np.array([dates, cosines, sines])
+            arr = np.array([dates, cosines, sines])
 
         # loop through blocks
         for _, window in src.block_windows(1):
-
             # read array with all bands
             stack = src.read(range(1, src.count + 1), window=window)
 
@@ -206,6 +227,7 @@ def mt_metrics(stack, out_prefix, metrics, rescale_to_datatype=False,
                 stack = remove_outliers(stack)
 
             # get stats
+            np.seterr(divide='ignore', invalid='ignore')
             arr = {}
             arr['p95'], arr['p5'] = (np.nan_to_num(nan_percentile(stack, [95, 5]))
                                      if 'p95' in metrics else (False, False))
@@ -222,18 +244,19 @@ def mt_metrics(stack, out_prefix, metrics, rescale_to_datatype=False,
             arr['cov'] = (np.nan_to_num(stats.variation(stack, axis=0,
                                                         nan_policy='omit'))
                           if 'cov' in metrics else False)
+            arr['count'] = (np.nan_to_num(np.count_nonzero(stack, axis=0))
+                          if 'count' in metrics else False)
 
             if harmonics:
-
                 stack_size = (stack.shape[1], stack.shape[2])
                 if to_power is True:
                     y = ras.convert_to_db(stack).reshape(stack.shape[0], -1)
                 else:
                     y = stack.reshape(stack.shape[0], -1)
 
-                x, residuals, _, _ = np.linalg.lstsq(X.T, y)
-                arr['amplitude'] = np.hypot(x[1], x[2]).reshape(stack_size)
-                arr['phase'] = np.arctan2(x[2], x[1]).reshape(stack_size)
+                arr, residuals, _, _ = np.linalg.lstsq(arr.T, y)
+                arr['amplitude'] = np.hypot(arr[1], arr[2]).reshape(stack_size)
+                arr['phase'] = np.arctan2(arr[2], arr[1]).reshape(stack_size)
                 arr['residuals'] = np.sqrt(
                     np.divide(residuals, stack.shape[0])
                 ).reshape(stack_size)
@@ -243,15 +266,16 @@ def mt_metrics(stack, out_prefix, metrics, rescale_to_datatype=False,
 
             # do the back conversions and write to disk loop
             for metric in metrics:
-
                 if to_power is True and metric in metrics_to_convert:
                     arr[metric] = ras.convert_to_db(arr[metric])
 
                 if rescale_to_datatype is True and meta['dtype'] != 'float32':
-                    arr[metric] = ras.scale_to_int(arr[metric], meta['dtype'],
-                                                   minimums[metric],
-                                                   maximums[metric])
-
+                    arr[metric] = ras.scale_to_int(
+                        arr[metric],
+                        meta['dtype'],
+                        minimums[metric],
+                        maximums[metric]
+                    )
                 # write to dest
                 metric_dict[metric].write(
                     np.float32(arr[metric]), window=window, indexes=1)
@@ -273,3 +297,38 @@ def mt_metrics(stack, out_prefix, metrics, rescale_to_datatype=False,
     check_file = opj(dirname, '.{}.processed'.format(os.path.basename(out_prefix)))
     with open(str(check_file), 'w') as file:
         file.write('passed all tests \n')
+
+
+def create_tscan_vrt(timescan_dir, ard_params):
+    # loop through all pontial proucts
+    # a products list
+    product_list = ['TC.HH', 'TC.VV', 'TC.HV', 'TC.VH',
+                    'BS.HH', 'BS.VV', 'BS.HV', 'BS.VH',
+                    'coh.VV', 'coh.VH', 'coh.HH', 'coh.HV',
+                    'pol.Entropy', 'pol.Anisotropy', 'pol.Alpha'
+                    ]
+
+    i, outfiles = 0, []
+    iteration = itertools.product(product_list, ard_params['metrics'])
+    for product, metric in iteration:
+
+        # get file and add number for outfile
+        infile = opj(timescan_dir, '{}.{}.tif'.format(product, metric))
+
+        # if there is no file sto the iteration
+        if not os.path.isfile(infile):
+            continue
+
+        # else
+        i += 1
+        outfile = opj(timescan_dir,
+                      '{}.{}.{}.tif'.format(i, product, metric))
+        outfiles.append(outfile)
+        # otherwise rename the file
+        shutil.move(infile, outfile)
+
+    vrt_options = gdal.BuildVRTOptions(srcNodata=0, separate=True)
+    gdal.BuildVRT(opj(timescan_dir, 'Timescan.vrt'.format()),
+                  outfiles,
+                  options=vrt_options
+                  )

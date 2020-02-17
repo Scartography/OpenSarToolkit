@@ -45,17 +45,17 @@ python3 grd_to_ardBatch.py -i /path/to/inventory -r 20 -p RTC -l True -s False
 
 import os
 from os.path import join as opj
+from re import findall
 import glob
 import gdal
-import json
 import logging
 import itertools
 from tempfile import TemporaryDirectory
 
 from ost import Sentinel1Scene
-from ost.helpers import raster as ras
 from ost.multitemporal import vector as mt_vec, timescan
 from ost.multitemporal.ard_to_ts import ard_to_ts
+from ost.multitemporal.timescan import create_tscan_vrt
 from ost.mosaic import mosaic
 
 logger = logging.getLogger(__name__)
@@ -210,22 +210,19 @@ def timeseries_to_timescan(
         processing_dir,
         ard_params=None
 ):
+    to_db = False
     # get the db scaling right
-    to_db = ard_params['to_db']
-    if ard_params['to_db'] or ard_params['to_db']:
+    if ard_params['to_db']:
         to_db = True
 
     dtype_conversion = True if ard_params['dtype_output'] != 'float32' else False
-
     for track in inventory_df.relativeorbit.unique():
-
         logger.debug('INFO: Entering track {}.'.format(track))
         # get track directory
         track_dir = opj(processing_dir, track)
         # define and create Timescan directory
         timescan_dir = opj(track_dir, 'Timescan')
         os.makedirs(timescan_dir, exist_ok=True)
-
         # loop thorugh each polarization
         for polar in ['VV', 'VH', 'HH', 'HV']:
             if os.path.isfile(opj(timescan_dir, '.{}.processed'.format(polar))):
@@ -234,31 +231,39 @@ def timeseries_to_timescan(
                     ' processed.'.format(track))
                 continue
             # Get timeseries vrt
-            timeseries = opj(track_dir,
-                             'Timeseries',
-                             'Timeseries.BS.{}.vrt'.format(polar)
-                             )
-            if not os.path.isfile(timeseries):
+            timeseries_vrt = glob.glob(
+                opj(track_dir, 'Timeseries', '*.TC.{}.vrt'.format(polar))
+            )
+            if len(timeseries_vrt) > 1:
+                raise RuntimeError(
+                    'More vrt file per polarization in the timeseries of track: %s',
+                    track
+                )
+            elif len(timeseries_vrt) == 0:
+                logger.debug(
+                    'This polarisation %s is not availible in track %s', polar, track
+                )
                 continue
+            timeseries_vrt = timeseries_vrt[0]
+            if not os.path.isfile(timeseries_vrt):
+                raise RuntimeError('VRT file for timeseries in track %s missing!', track)
             logger.debug(
                 'INFO: Processing Timescans of {} for track {}.'.format(polar, track)
             )
             # create a datelist for harmonics
             scenelist = glob.glob(
-                opj(track_dir, '*BS.{}.tif'.format(polar))
+                opj(track_dir, 'Timeseries', '*TC.{}.tif'.format(polar))
             )
 
             # create a datelist for harmonics calculation
             datelist = []
             for file in sorted(scenelist):
-                datelist.append(os.path.basename(file).split('.')[1])
-
+                datelist.append(findall(r"\D(\d{8})\D", os.path.basename(file)))
             # define timescan prefix
             timescan_prefix = opj(timescan_dir, 'TC.{}'.format(polar))
-
             # run timescan
             timescan.mt_metrics(
-                timeseries,
+                timeseries_vrt,
                 timescan_prefix,
                 ard_params['metrics'],
                 rescale_to_datatype=dtype_conversion,
@@ -286,7 +291,6 @@ def mosaic_timeseries(
 
     # loop through polarisations
     for p in ['VV', 'VH', 'HH', 'HV']:
-
         tracks = inventory_df.relativeorbit.unique()
         nr_of_ts = len(glob.glob(opj(
             processing_dir, tracks[0], 'Timeseries', '*.{}.tif'.format(p))))
@@ -348,14 +352,12 @@ def mosaic_timeseries(
                       )
 
 
-def mosaic_timescan(inventory_df, processing_dir, temp_dir, proc_file,
-                    cut_to_aoi=False, exec_file=None):
-
-    # load ard parameters
-    with open(proc_file, 'r') as ard_file:
-        ard_params = json.load(ard_file)['processing parameters']
-        metrics = ard_params['time-scan ARD']['metrics']
-
+def mosaic_timescan(
+        processing_dir,
+        ard_params,
+        cut_to_aoi=False,
+):
+    metrics = ard_params['metrics']
     if 'harmonics' in metrics:
         metrics.remove('harmonics')
         metrics.extend(['amplitude', 'phase', 'residuals'])
@@ -371,10 +373,9 @@ def mosaic_timescan(inventory_df, processing_dir, temp_dir, proc_file,
 
     # loop through all pontial proucts
     for polar, metric in itertools.product(['VV', 'HH', 'VH', 'HV'], metrics):
-
         # create a list of files based on polarisation and metric
         filelist = glob.glob(opj(processing_dir, '*', 'Timescan',
-                                 '*BS.{}.{}.tif'.format(polar, metric)
+                                 '*TC.{}.{}.tif'.format(polar, metric)
                                  )
                              )
 
@@ -389,17 +390,14 @@ def mosaic_timescan(inventory_df, processing_dir, temp_dir, proc_file,
             os.path.dirname(outfile),
             '.{}.processed'.format(os.path.basename(outfile)[:-4])
         )
-
         if os.path.isfile(check_file):
             logger.debug('INFO: Mosaic layer {} already '
-                  ' processed.'.format(os.path.basename(outfile)))
+                         ' processed.'.format(os.path.basename(outfile))
+                         )
             continue
 
         logger.debug('INFO: Mosaicking layer {}.'.format(os.path.basename(outfile)))
-        mosaic.mosaic(filelist, outfile, temp_dir, cut_to_aoi)
+        mosaic.mosaic(filelist, outfile, cut_to_aoi)
         outfiles.append(outfile)
 
-    if exec_file:
-        logger.debug(' gdalbuildvrt ....command, outfiles')
-    else:
-        ras.create_tscan_vrt(tscan_dir, proc_file)
+    create_tscan_vrt(tscan_dir, ard_params)

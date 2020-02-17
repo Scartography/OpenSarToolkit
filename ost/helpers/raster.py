@@ -9,9 +9,6 @@ import gdal
 import osr
 import ogr
 import fiona
-import json
-import shutil
-import itertools
 import imageio
 import rasterio
 import rasterio.mask
@@ -54,7 +51,7 @@ def read_file(rasterfn):
     pixel_width = geotransform[1]
     pixel_height = geotransform[5]
     driver = gdal.GetDriverByName('GTiff')  # critical!!!!!!!!!!!!!!!!!!!!!!!
-    ndv = raster.GetRasterBand(1).GetNoDataValue()
+    no_data = raster.GetRasterBand(1).GetNoDataValue()
 
     # we need this for file creation
     outraster_srs = osr.SpatialReference()
@@ -63,7 +60,7 @@ def read_file(rasterfn):
     # we return a dict of all relevant values
     return {'xB': x_block_size, 'yB': y_block_size, 'cols': cols, 'rows': rows,
             'bands': bands, 'dType': data_type, 'dTypeName': data_type_name,
-            'ndv': ndv, 'gtr': geotransform, 'oX': origin_x, 'oY': origin_y,
+            'no_data': no_data, 'gtr': geotransform, 'oX': origin_x, 'oY': origin_y,
             'pW': pixel_width, 'pH': pixel_height, 'driver': driver,
             'outR': outraster_srs}
 
@@ -105,8 +102,8 @@ def create_file(
                               )
 
     outraster.SetProjection(geodict['outR'].ExportToWkt())
-    if geodict['ndv'] is not None:
-        outraster.GetRasterBand(1).SetNoDataValue(geodict['ndv'])
+    if geodict['no_data'] is not None:
+        outraster.GetRasterBand(1).SetNoDataValue(geodict['no_data'])
     return outraster
 
 
@@ -114,7 +111,7 @@ def create_file(
 def chunk_to_raster(
         outraster,
         array_chunk,
-        ndv,
+        no_data,
         x_pos,
         y_pos,
         z_pos
@@ -167,6 +164,8 @@ def polygonize_raster(
         mask_value=1,
         driver='ESRI Shapefile'
 ):
+    import warnings
+    warnings.filterwarnings("ignore")
     with rasterio.open(infile) as src:
         image = src.read(1)
         if mask_value is not None:
@@ -190,7 +189,7 @@ def polygonize_raster(
 def outline(
         infile,
         outfile,
-        ndv=0,
+        no_data=0,
         less_then=False
 ):
     '''
@@ -199,7 +198,7 @@ def outline(
 
     :param infile: input raster file
     :param outfile: output shapefile
-    :param ndv: no data value of the input raster
+    :param no_data: no data value of the input raster
     :return:
     '''
     with rasterio.open(infile) as src:
@@ -222,10 +221,10 @@ def outline(
                 # get stats
                 min_array = np.nanmin(stack, axis=0)
                 if less_then is True:
-                    min_array[min_array <= ndv] = 0
+                    min_array[min_array <= no_data] = 0
                 else:
-                    min_array[min_array == ndv] = 0
-                min_array[min_array != ndv] = 1
+                    min_array[min_array == no_data] = 0
+                min_array[min_array != no_data] = 1
                 # write to dest
                 out_min.write(np.uint8(min_array), window=window, indexes=1)
 
@@ -322,41 +321,41 @@ def rescale_to_float(
     return float_array
 
 
-def mask_by_shape(
+def to_gtiff_clip_by_extend(
         infile,
         outfile,
-        shapefile,
+        vector,
         to_db=False,
         datatype='float32',
         rescale=True,
         min_value=0.000001,
         max_value=1,
-        ndv=None,
+        no_data=0.0,
         description=True
 ):
-
-    # import shapefile geometries
-    with fiona.open(shapefile, 'r') as file:
-        features = [feature['geometry'] for feature in file
-                    if feature['geometry']]
+    # import shapefile geometries if clip flag ok
+    with fiona.open(vector, 'r') as file:
+        features = [feature['geometry']
+                    for feature in file
+                    if feature['geometry']
+                    ]
 
     # import raster
     with rasterio.open(infile) as src:
         out_image, out_transform = rasterio.mask.mask(src, features, crop=True)
         out_meta = src.meta.copy()
-        out_image = np.ma.masked_where(out_image == ndv, out_image)
+        out_image = np.ma.masked_where(out_image == no_data, out_image)
 
     # unmask array
     out_image = out_image.data
 
     # if to decibel should be applied
-    if to_db is True:
+    if to_db:
         out_image = convert_to_db(out_image)
 
     if rescale:
         # if we scale to another d
         if datatype != 'float32':
-
             if datatype == 'uint8':
                 out_image = scale_to_int(out_image, min_value, max_value, 'uint8')
             elif datatype == 'uint16':
@@ -366,7 +365,7 @@ def mask_by_shape(
                      'height': out_image.shape[1],
                      'width': out_image.shape[2],
                      'transform': out_transform,
-                     'nodata': ndv,
+                     'nodata': no_data,
                      'dtype': datatype,
                      'tiled': True,
                      'blockxsize': 128,
@@ -377,48 +376,11 @@ def mask_by_shape(
         dest.write(out_image)
         if description:
             dest.update_tags(1,
-                             BAND_NAME='{}'.format(os.path.basename(infile)[:-4]))
+                             BAND_NAME='{}'.format(os.path.basename(infile)[:-4])
+                             )
             dest.set_band_description(1,
-                                      '{}'.format(os.path.basename(infile)[:-4]))
-
-
-def create_tscan_vrt(timescan_dir, proc_file):
-    # load ard parameters
-    with open(proc_file, 'r') as ard_file:
-        ard_params = json.load(ard_file)['processing parameters']
-        ard_tscan = ard_params['time-scan ARD']
-
-    # loop through all pontial proucts
-    # a products list
-    product_list = ['bs.HH', 'bs.VV', 'bs.HV', 'bs.VH',
-                    'coh.VV', 'coh.VH', 'coh.HH', 'coh.HV',
-                    'pol.Entropy', 'pol.Anisotropy', 'pol.Alpha'
-                    ]
-
-    i, outfiles = 0, []
-    iteration = itertools.product(product_list, ard_tscan['metrics'])
-    for product, metric in iteration:
-
-        # get file and add number for outfile
-        infile = opj(timescan_dir, '{}.{}.tif'.format(product, metric))
-
-        # if there is no file sto the iteration
-        if not os.path.isfile(infile):
-            continue
-
-        # else
-        i += 1
-        outfile = opj(timescan_dir,
-                      '{}.{}.{}.tif'.format(i, product, metric))
-        outfiles.append(outfile)
-        # otherwise rename the file
-        shutil.move(infile, outfile)
-
-    vrt_options = gdal.BuildVRTOptions(srcNodata=0, separate=True)
-    gdal.BuildVRT(opj(timescan_dir, 'Timescan.vrt'.format()),
-                  outfiles,
-                  options=vrt_options
-                  )
+                                      '{}'.format(os.path.basename(infile)[:-4])
+                                      )
 
 
 def norm(band, percentile=False):
@@ -562,11 +524,14 @@ def create_rgb_jpeg(
         with rasterio.open(outfile, 'w', **out_meta) as out:
             out.write(arr.astype('uint8'))
         if date:
-            label_height = np.floor(np.divide(int(out_meta['height']), 15))
+            label_height = np.floor(
+                np.divide(int(out_meta['height']), 15)
+            )
             cmd = 'convert -background \'#0008\'-fill white -gravity center \
                   -size {}x{} caption:\"{}\"{} +swap -gravity north \
                   -composite {}'.format(out_meta['width'], label_height,
-                                        date, outfile, outfile)
+                                        date, outfile, outfile
+                                        )
             h.run_command(cmd, '{}.log'.format(outfile), elapsed=False)
     if plot:
         plt.imshow(arr)

@@ -2,7 +2,6 @@ import os
 from os.path import join as opj
 import importlib
 import glob
-import json
 import datetime
 import logging
 from tempfile import TemporaryDirectory
@@ -10,7 +9,7 @@ from tempfile import TemporaryDirectory
 import gdal
 
 from ost.helpers import raster as ras, helpers as h
-from ost.speckle_settings import DEFAULT_SPECKLE_DICT
+from ost.config.speckle_config import DEFAULT_MT_SPECKLE_DICT
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +69,7 @@ def mt_speckle_filter(
     # get gpt file
     gpt_file = h.gpt_path()
     if speckle_dict is None:
-        speckle_dict = DEFAULT_SPECKLE_DICT
+        speckle_dict = DEFAULT_MT_SPECKLE_DICT
 
     logger.debug(' INFO: Applying multi-temporal speckle filtering.')
     # contrcut command string
@@ -139,11 +138,11 @@ def ard_to_ts(
         return
 
     # get the db scaling right
-    to_db = ard_params['to_db']
-    if to_db or product_suffix is not 'BS':
+    to_db = ard_params['to_db_mt']
+    if to_db or product_suffix is not 'TC':
         to_db = False
     else:
-        to_db = ard_params['to_db']
+        to_db = ard_params['to_db_mt']
 
     if ard_params['apply_ls_mask']:
         extent = opj(track_dir, '{}.extent.masked.shp'.format(track))
@@ -249,14 +248,17 @@ def ard_to_ts(
                                                 )
                               )
 
-                ras.mask_by_shape(infile, outfile, extent,
-                                  to_db=to_db,
-                                  datatype=ard_params['dtype_output'],
-                                  min_value=mm_dict[stretch]['min'],
-                                  max_value=mm_dict[stretch]['max'],
-                                  ndv=0.0,
-                                  description=True
-                                  )
+                ras.to_gtiff_clip_by_extend(
+                    infile,
+                    outfile,
+                    extent,
+                    to_db=to_db,
+                    datatype=ard_params['dtype_output'],
+                    min_value=mm_dict[stretch]['min'],
+                    max_value=mm_dict[stretch]['max'],
+                    no_data=0.0,
+                    description=True
+                )
                 # add ot a list for suBSequent vrt creation
                 outfiles.append(outfile)
                 i += 1
@@ -274,16 +276,17 @@ def ard_to_ts(
             for date in sorted_date:
                 # restructure date to YYMMDD
                 in_date = datetime.datetime.strptime(date, '%d%b%Y')
-                out_date = datetime.datetime.strftime(in_date, '%y%m%d')
+                out_date = datetime.datetime.strftime(in_date, '%Y%m%d')
 
                 infile = glob.glob(opj('{}.data'.format(out_stack),
                                        '*{}*{}*img'.format(pol, date))
                                    )[0]
                 # create outfile
-                outfile = opj(out_dir, '{}.{}.{}.{}.tif'.format(
-                    i, out_date, product_suffix, pol))
+                outfile = opj(
+                    out_dir, '{}.{}.{}.{}.tif'.format(i, out_date, product_suffix, pol)
+                )
 
-                ras.mask_by_shape(
+                ras.to_gtiff_clip_by_extend(
                     infile,
                     outfile,
                     extent,
@@ -291,7 +294,7 @@ def ard_to_ts(
                     datatype=ard_params['dtype_output'],
                     min_value=mm_dict[stretch]['min'],
                     max_value=mm_dict[stretch]['max'],
-                    ndv=0.0
+                    no_data=0.0
                 )
                 # add ot a list for subsequent vrt creation
                 outfiles.append(outfile)

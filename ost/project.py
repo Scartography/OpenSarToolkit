@@ -42,7 +42,6 @@ class Generic():
         # handle the import of different aoi formats and transform
         # to a WKT string
         if aoi.split('.')[-1] != 'shp'and len(aoi) == 3:
-
             # get lowres data
             world = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
             country = world.name[world.iso_a3 == aoi].values[0]

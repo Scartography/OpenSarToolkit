@@ -181,7 +181,6 @@ def _to_shapefile(gdf, outfile, append=False):
                 'swathidentifier', 'ingestiondate',
                 'sensoroperationalmode', 'geometry'
             ]
-
             # get existing geodataframe from file
             old_df = gpd.read_file(outfile)
             old_df.columns = columns
