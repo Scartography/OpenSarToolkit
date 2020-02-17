@@ -849,19 +849,18 @@ def grd_to_ard(filelist,
                 os.path.basename(file)[:-5]))
             logfile = opj(output_dir, '{}_Import.errLog'.format(
                 os.path.basename(file)[:-5]))
-            if subset is not None:
-                grd_subset = opj(temp_dir, '{}_imported_subset'.format(out_prefix))
-                return_code = _grd_subset_georegion('{}.dim'.format(grd_import),
-                                                    grd_subset, logfile, subset
-                                                    )
-                if return_code != 0:
-                    h.remove_folder_content(temp_dir)
-                    return return_code
-            else:
+            if subset is None:
                 return_code = _grd_frame_import(file, grd_import, logfile)
-                if return_code != 0:
-                    h.remove_folder_content(temp_dir)
-                    return return_code
+            else:
+                return_code = _grd_frame_import_subset(
+                    infile=file,
+                    outfile=grd_import,
+                    georegion=subset,
+                    logfile=logfile
+                )
+            if return_code != 0:
+                h.remove_folder_content(temp_dir)
+                return return_code
 
         # create list of scenes for full acquisition in
         # preparation of slice assembly
