@@ -362,7 +362,7 @@ class Sentinel1Batch(Sentinel1):
         self.ard_parameters = {}
         self.set_ard_parameters(ard_type)
         self.timeseries_dir = opj(self.processing_dir, '*', 'Timeseries')
-        self.timescan_dir = opj(self.timescan_dir, '*', 'Timescan')
+        self.timescan_dir = opj(self.processing_dir, '*', 'Timescan')
         self.animations_dir = opj(self.processing_dir, '*', 'Animations')
 
     # processing related functions
