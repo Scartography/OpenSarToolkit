@@ -241,7 +241,7 @@ def timeseries_to_timescan(
                 )
             elif len(timeseries_vrt) == 0:
                 logger.debug(
-                    'This polarisation %s is not availible in track %s', polar, track
+                    'The %s polarisation is not availible in track %s', polar, track
                 )
                 continue
             timeseries_vrt = timeseries_vrt[0]

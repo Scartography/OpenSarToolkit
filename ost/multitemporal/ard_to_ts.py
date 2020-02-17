@@ -138,11 +138,8 @@ def ard_to_ts(
                      )
         return
 
-    # get the db scaling right
-    to_db = ard_params['to_db_mt']
-    if to_db or product_suffix is not 'TC':
-        to_db = False
-    else:
+    # get the DB scaling
+    if product_suffix is not 'coh':
         to_db = ard_params['to_db_mt']
 
     if ard_params['apply_ls_mask']:

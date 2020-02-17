@@ -349,7 +349,7 @@ class Sentinel1Batch(Sentinel1):
                  product_type='SLC',
                  beam_mode='IW',
                  polarisation='*',
-                 rel_orbit='*',
+                 track='*',
                  ard_type='OST'
                  ):
 
