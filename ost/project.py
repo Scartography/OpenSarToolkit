@@ -520,7 +520,7 @@ class Sentinel1Batch(Sentinel1):
                                      add_dates=False
                                      ):
         for track in self.inventory.relativeorbit.unique():
-            track_ts_folder = self.timeseries_dir, track
+            track_ts_folder = opj(self.timeseries_dir, track)
             create_timeseries_animation(
                 track_ts_folder=track_ts_folder,
                 product_list=['TC.VV', 'TC.VH'],

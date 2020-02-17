@@ -29,7 +29,6 @@ from ost.s1.convert_format import ard_to_rgb, ard_to_thumbnail, ard_slc_to_rgb, 
     ard_slc_to_thumbnail
 from ost.helpers.bursts import get_bursts_by_polygon
 
-
 logger = logging.getLogger(__name__)
 
 

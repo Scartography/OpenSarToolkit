@@ -1,14 +1,17 @@
 import os
 import imageio
 import glob
-from os.path import join as opj
 import time
+import logging
+from os.path import join as opj
 
 import gdal
 import rasterio
 import numpy as np
 
 from ost.helpers import utils as h, raster as ras, vector as vec
+
+logger = logging.getLogger(__name__)
 
 
 def create_timeseries_animation(
@@ -19,6 +22,8 @@ def create_timeseries_animation(
         duration=1,
         add_dates=False
 ):
+    if not os.path.exists(out_folder):
+        os.makedirs(out_folder, exist_ok=True)
     nr_of_products = len(glob.glob(
         opj(track_ts_folder, '*{}.tif'.format(product_list[0]))))
     outfiles = []
