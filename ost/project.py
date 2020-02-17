@@ -514,7 +514,10 @@ class Sentinel1Batch(Sentinel1):
                 '{}.refined.shp'.format(outfile[:-4])
             )
 
-    def create_timeseries_animations(self
+    def create_timeseries_animations(self,
+                                     shrink_factor=5,
+                                     duration=1,
+                                     add_dates=False
                                      ):
         for track in self.inventory.relativeorbit.unique():
             track_ts_folder = self.timeseries_dir, track
@@ -522,9 +525,9 @@ class Sentinel1Batch(Sentinel1):
                 track_ts_folder=track_ts_folder,
                 product_list=['TC.VV', 'TC.VH'],
                 out_folder=self.animations_dir,
-                shrink_factor=5,
-                duration=2,
-                add_dates=False
+                shrink_factor=shrink_factor,
+                duration=duration,
+                add_dates=add_dates
             )
 
     def read_burst_inventory(self, key):

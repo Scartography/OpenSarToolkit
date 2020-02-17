@@ -84,6 +84,7 @@ def test_sentinel1_grd_batch(some_bounds):
         )
         sen1.create_timeseries()
         sen1.create_timescan()
+        sen1.create_timeseries_animations()
 
 
 @pytest.mark.skip(reason="Download is tested in the batch!")
