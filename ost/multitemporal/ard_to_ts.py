@@ -347,13 +347,13 @@ def _get_coh_ts(
                                         polarization
                                         )
         )
-
+        logger.debug('Writing to file %s', outfile)
         ras.to_gtiff_clip_by_extend(
             infile,
             outfile,
             extent,
             to_db=to_db,
-            datatype=out_dtype,
+            out_dtype=out_dtype,
             min_value=min,
             max_value=max,
             no_data=0.0,
