@@ -753,6 +753,8 @@ class Sentinel1Scene:
                 processing_poly = None
             # get file paths
             master_file = self.get_path(out_dir)
+            if isinstance(master_file, str):
+                master_file = [master_file]
             # get bursts
             master_bursts = self._zip_annotation_get(download_dir=out_dir)
             bursts_dict = get_bursts_by_polygon(

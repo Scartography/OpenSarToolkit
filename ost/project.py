@@ -511,6 +511,10 @@ class Sentinel1Batch(Sentinel1):
                 '{}.refined.shp'.format(outfile[:-4])
             )
 
+    def create_timeseries_animations(self):
+
+        raise NotImplementedError
+
     def read_burst_inventory(self, key):
         '''Read the Sentinel-1 data inventory from a OST inventory shapefile
 

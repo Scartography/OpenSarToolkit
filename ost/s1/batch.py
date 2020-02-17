@@ -53,7 +53,8 @@ import itertools
 from tempfile import TemporaryDirectory
 
 from ost import Sentinel1Scene
-from ost.multitemporal import vector as mt_vec, timescan
+from ost.multitemporal.utils import mt_extent, mt_layover
+from ost.multitemporal import timescan
 from ost.multitemporal.ard_to_ts import ard_to_ts
 from ost.multitemporal.timescan import create_tscan_vrt
 from ost.mosaic import mosaic
@@ -156,7 +157,7 @@ def ards_to_timeseries(
 
         logger.debug('INFO: Creating common extent mask for track {}'.format(track))
         with TemporaryDirectory() as temp_dir:
-            mt_vec.mt_extent(list_of_scenes, extent, temp_dir, -0.0018)
+            mt_extent(list_of_scenes, extent, temp_dir, -0.0018)
 
     if ard_params['create_ls_mask'] or ard_params['apply_ls_mask']:
         for track in inventory_df.relativeorbit.unique():
@@ -174,7 +175,7 @@ def ards_to_timeseries(
                 'INFO: Creating common Layover/Shadow mask for track {}'.format(track)
             )
             with TemporaryDirectory() as temp_dir:
-                mt_vec.mt_layover(
+                mt_layover(
                     list_of_layover,
                     out_ls,
                     temp_dir,

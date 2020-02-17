@@ -544,54 +544,6 @@ def create_rgb_jpeg(
         plt.imshow(arr)
 
     
-def create_timeseries_animation(
-        timeseries_folder,
-        product_list,
-        out_folder,
-        shrink_factor=1,
-        duration=1,
-        add_dates=False
-):
-
-    nr_of_products = len(glob.glob(
-        opj(timeseries_folder, '*{}.tif'.format(product_list[0]))))
-    outfiles = []
-    # for coherence it must be one less
-    if 'coh.VV' in product_list or 'coh.VH' in product_list:
-        nr_of_products = nr_of_products - 1
-    # Iterate over the tifs from the timeseries
-    for i in range(nr_of_products):
-        filelist = [glob.glob(
-            opj(timeseries_folder, '{}.*{}*tif'.format(i + 1, product))
-        )[0]
-                    for product in product_list
-                    ]
-        dates = os.path.basename(filelist[0]).split('.')[1]
-        if add_dates:
-            date = dates
-        else:
-            date = None
-
-        create_rgb_jpeg(filelist, 
-                        opj(out_folder, '{}.{}.jpeg'.format(i+1, dates)),
-                        shrink_factor, 
-                        date=date
-                        )
-        outfiles.append(opj(out_folder, '{}.{}.jpeg'.format(i+1, dates)))
-    # create gif
-    with imageio.get_writer(
-            opj(out_folder, 'ts_animation.gif'),
-            mode='I',
-            duration=duration
-    ) as writer:
-        for file in outfiles:
-            image = imageio.imread(file)
-            writer.append_data(image)
-            os.remove(file)
-            if os.path.isfile(file + '.aux.xml'):
-                os.remove(file + '.aux.xml')
-
-
 def np_binary_erosion(
         input_array,
         structure=np.ones((3, 3)).astype(np.bool)
