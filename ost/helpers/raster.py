@@ -14,7 +14,7 @@ import rasterio
 import rasterio.mask
 from rasterio.features import shapes
 
-from ost.helpers import helpers as h
+from ost.helpers import utils as h
 
 logger = logging.getLogger(__name__)
 

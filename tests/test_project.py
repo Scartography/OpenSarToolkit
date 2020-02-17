@@ -6,7 +6,7 @@ from shapely.geometry import box
 from tempfile import TemporaryDirectory
 from ost.project import Sentinel1 as Sen1, Sentinel1Batch as SenBatch
 
-from ost.settings import HERBERT_USER, SINGLE_ARD_OPTIONS
+from ost.settings import HERBERT_USER
 
 logger = logging.getLogger(__name__)
 
@@ -87,8 +87,8 @@ def test_sentinel1_grd_batch(some_bounds):
         sen1.create_timescan()
 
 
-@pytest.mark.skip(reason="Downlaod is tested in the batch!")
-def test_sentinel_generic_downlaod(some_bounds):
+@pytest.mark.skip(reason="Download is tested in the batch!")
+def test_sentinel_generic_download(some_bounds):
     with TemporaryDirectory() as temp, \
             TemporaryDirectory() as dl_temp, \
             TemporaryDirectory() as inv_temp:

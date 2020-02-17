@@ -1,48 +1,3 @@
-'''
-This script allows to produce Sentinel-1 backscatter ARD data
-from a set of different GRD products.
-The script allows to process consecutive frames from one acquisition and
-outputs a single file.
-
-
-----------------
-Functions:
-----------------
-    grd_to_ardBatch:
-        processes all acquisitions
-    ard2Ts:
-        processes all time-series
-
-------------------
-Main function
-------------------
-  grd2Ts:
-    handles the whole workflow
-
-------------------
-Contributors
-------------------
-
-Andreas Vollrath, ESA phi-lab
------------------------------------
-November 2018: Original implementation
-
-------------------
-Usage
-------------------
-
-python3 grd_to_ardBatch.py -i /path/to/inventory -r 20 -p RTC -l True -s False
-                   -t /path/to/tmp -o /path/to/output
-
-    -i    defines the path to one or a list of consecutive slices
-    -r    resolution in meters (should be 10 or more, default=20)
-    -p    defines the product type (GTCsigma, GTCgamma, RTC, default=GTCgamma)
-    -l    defines the layover/shadow mask creation (True/False, default=True)
-    -s    defines the speckle filter (True/False, default=False)
-    -t    defines the folder for temporary products (default=/tmp)
-    -o    defines the /path/to/the/output
-'''
-
 import os
 from os.path import join as opj
 from re import findall
@@ -53,6 +8,7 @@ import itertools
 from tempfile import TemporaryDirectory
 
 from ost import Sentinel1Scene
+from ost.helpers.utils import _create_processing_dict
 from ost.multitemporal.utils import mt_extent, mt_layover
 from ost.multitemporal import timescan
 from ost.multitemporal.ard_to_ts import ard_to_ts
@@ -62,48 +18,14 @@ from ost.mosaic import mosaic
 logger = logging.getLogger(__name__)
 
 
-def _create_processing_dict(inventory_df):
-    '''This function might be oBSolete?
-
-    '''
-
-    # initialize empty dictionary
-    dict_scenes = {}
-    # get relative orbits and loop through each
-    tracklist = inventory_df['relativeorbit'].unique()
-    for track in tracklist:
-        # initialize an empty list that will be filled by
-        # list of scenes per acq. date
-        all_ids = []
-        # get acquisition dates and loop through each
-        acquisition_dates = inventory_df['acquisitiondate'][
-            inventory_df['relativeorbit'] == track].unique()
-
-        # loop through dates
-        for acquisition_date in acquisition_dates:
-            # get the scene ids per acquisition_date and write into a list
-            single_id = []
-            single_id.append(
-                inventory_df['identifier'][
-                    (inventory_df['relativeorbit'] == track) &
-                    (inventory_df['acquisitiondate'] == acquisition_date)
-                ].tolist())
-
-            # append the list of scenes to the list of scenes per track
-            all_ids.append(single_id[0])
-
-        # add this list to the dctionary and associate the track number
-        # as dict key
-        dict_scenes[track] = all_ids
-    return dict_scenes
-
-
 def _to_ard_batch(
         inventory_df,
         download_dir,
         processing_dir,
         ard_parameters,
         subset=None,
+        polar='VV,VH,HH,HV',
+        max_workers=int(os.cpu_count()/2)
 ):
     # we create a processing dictionary,
     # where all frames are grouped into acquisitions
@@ -135,8 +57,8 @@ def _to_ard_batch(
                         out_dir=out_dir,
                         out_prefix=s1_process_scene.start_date.replace('-', ''),
                         subset=subset,
-                        polar='VV,VH,HH,HV',
-                        max_workers=int(os.cpu_count()/2)
+                        polar=polar,
+                        max_workers=max_workers
                     )
 
 
@@ -337,7 +259,6 @@ def mosaic_timeseries(
             mosaic.mosaic(
                 filelist,
                 outfile,
-                temp_dir,
                 cut_to_aoi
             )
 

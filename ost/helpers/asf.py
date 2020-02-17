@@ -9,8 +9,8 @@ import urllib.error
 import urllib.request as urlreq
 
 
-from ost.helpers import helpers as h
-from ost.helpers.helpers import TqdmUpTo
+from ost.helpers import utils as h
+from ost.helpers.utils import TqdmUpTo
 from ost import Sentinel1Scene as S1Scene
 
 logger = logging.getLogger(__name__)

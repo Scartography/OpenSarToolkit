@@ -1,4 +1,4 @@
-from ost.helpers.helpers import gpt_path
+from ost.helpers.utils import gpt_path
 
 
 def test_gpt():

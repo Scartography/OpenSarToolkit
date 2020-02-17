@@ -23,7 +23,7 @@ from godale import Executor
 
 from ost.settings import SNAP_S1_RESAMPLING_METHODS
 from ost.helpers import scihub, raster as ras
-from ost.helpers.helpers import execute_ard
+from ost.helpers.utils import execute_ard
 from ost.s1.grd_to_ard import grd_to_ard
 from ost.s1.convert_format import ard_to_rgb, ard_to_thumbnail, ard_slc_to_rgb, \
     ard_slc_to_thumbnail
@@ -241,32 +241,24 @@ class Sentinel1Scene:
         return uuid
 
     def scihub_url(self, opener):
-
         uuid = self.scihub_uuid(opener)
         # scihub url
         scihub_url = 'https://scihub.copernicus.eu/apihub/odata/v1/Products'
         # construct the download url
         download_url = '{}(\'{}\')/$value'.format(scihub_url, uuid)
-
         return download_url
 
     def scihub_md5(self, opener):
-
         uuid = self.scihub_uuid(opener)
         scihub_url = 'https://scihub.copernicus.eu/apihub/odata/v1/Products'
-        download_url = '{}(\'{}\')/Checksum/Value/$value'.format(scihub_url,
-                                                                 uuid)
+        download_url = '{}(\'{}\')/Checksum/Value/$value'.format(scihub_url, uuid)
         return download_url
 
     def scihub_online_status(self, opener):
-
         uuid = self.scihub_uuid(opener)
         scihub_url = 'https://scihub.copernicus.eu/apihub/odata/v1/Products'
-
         url = '{}(\'{}\')/Online/$value'.format(scihub_url, uuid)
-
         try:
-            # get the request
             req = opener.open(url)
         except URLError as error:
             if hasattr(error, 'reason'):
@@ -286,7 +278,6 @@ class Sentinel1Scene:
                 response = True
             elif response == 'false':
                 response = False
-
         return response
 
     def scihub_trigger_production(self, opener):

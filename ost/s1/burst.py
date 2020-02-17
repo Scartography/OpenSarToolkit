@@ -15,7 +15,7 @@ import itertools
 import gdal
 import geopandas as gpd
 
-from ost.helpers import scihub, vector as vec, raster as ras, helpers as h
+from ost.helpers import scihub, vector as vec, raster as ras, utils as h
 from ost.s1 import burst_to_ard, timeseries
 from ost import Sentinel1Scene as S1Scene
 

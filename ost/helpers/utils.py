@@ -422,3 +422,34 @@ class TqdmUpTo(tqdm):
             self.total = tsize
         # will also set self.n = b * bsize
         self.update(b * bsize - self.n)
+
+
+def _create_processing_dict(inventory_df):
+    dict_scenes = {}
+    # get relative orbits and loop through each
+    tracklist = inventory_df['relativeorbit'].unique()
+    for track in tracklist:
+        # initialize an empty list that will be filled by
+        # list of scenes per acq. date
+        all_ids = []
+        # get acquisition dates and loop through each
+        acquisition_dates = inventory_df['acquisitiondate'][
+            inventory_df['relativeorbit'] == track].unique()
+
+        # loop through dates
+        for acquisition_date in acquisition_dates:
+            # get the scene ids per acquisition_date and write into a list
+            single_id = []
+            single_id.append(
+                inventory_df['identifier'][
+                    (inventory_df['relativeorbit'] == track) &
+                    (inventory_df['acquisitiondate'] == acquisition_date)
+                    ].tolist())
+
+            # append the list of scenes to the list of scenes per track
+            all_ids.append(single_id[0])
+
+        # add this list to the dctionary and associate the track number
+        # as dict key
+        dict_scenes[track] = all_ids
+    return dict_scenes

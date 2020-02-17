@@ -8,7 +8,7 @@ import gdal
 import rasterio
 import numpy as np
 
-from ost.helpers import helpers as h, raster as ras, vector as vec
+from ost.helpers import utils as h, raster as ras, vector as vec
 
 
 def create_timeseries_animation(

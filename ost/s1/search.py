@@ -344,7 +344,7 @@ def scihub_catalogue(
 
 if __name__ == "__main__":
     import argparse
-    from ost.helpers import helpers
+    from ost.helpers import utils
 
     # get the current date
     NOW = datetime.datetime.now()
@@ -384,12 +384,12 @@ if __name__ == "__main__":
     PARSER.add_argument("-b", "--begindate",
                         help="The Start Date (format: YYYY-MM-DD) ",
                         default="2014-10-01",
-                        type=lambda x: helpers.is_valid_date(PARSER, x)
+                        type=lambda x: utils.is_valid_date(PARSER, x)
                         )
     PARSER.add_argument("-e", "--enddate",
                         help="The End Date (format: YYYY-MM-DD)",
                         default=NOW,
-                        type=lambda x: helpers.is_valid_date(PARSER, x)
+                        type=lambda x: utils.is_valid_date(PARSER, x)
                         )
     PARSER.add_argument("-t", "--producttype",
                         help="The Product Type (RAW, SLC, GRD, *) ",

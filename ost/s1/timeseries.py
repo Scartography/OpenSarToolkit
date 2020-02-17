@@ -13,7 +13,7 @@ import rasterio
 import numpy as np
 from scipy import stats
 
-from ost.helpers import helpers as h, raster as ras, vector as vec
+from ost.helpers import utils as h, raster as ras, vector as vec
 
 logger = logging.getLogger(__name__)
 

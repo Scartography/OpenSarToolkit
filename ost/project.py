@@ -12,7 +12,7 @@ from ost.s1 import burst
 from ost.helpers import vector as vec
 from ost.s1 import search, refine, s1_dl, batch
 from ost.s1.batch import _to_ard_batch
-from ost.helpers import scihub, helpers as h
+from ost.helpers import scihub, utils as h
 from ost.settings import SNAP_S1_RESAMPLING_METHODS, ARD_TIMESCAN_METRICS
 
 from ost.errors import EmptyInventoryException

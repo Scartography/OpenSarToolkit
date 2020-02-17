@@ -4,7 +4,7 @@ import rasterio
 from shapely.geometry import box
 from tempfile import TemporaryDirectory
 
-from ost.helpers.helpers import _zip_s1_safe_dir
+from ost.helpers.utils import _zip_s1_safe_dir
 
 
 def test_ost_grd_to_ard(

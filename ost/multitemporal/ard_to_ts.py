@@ -8,7 +8,7 @@ from tempfile import TemporaryDirectory
 
 import gdal
 
-from ost.helpers import raster as ras, helpers as h
+from ost.helpers import raster as ras, utils as h
 from ost.config.speckle_config import DEFAULT_MT_SPECKLE_DICT
 
 logger = logging.getLogger(__name__)

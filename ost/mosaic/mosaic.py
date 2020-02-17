@@ -5,7 +5,7 @@ import numpy as np
 from tempfile import TemporaryDirectory
 import rasterio
 
-from ost.helpers import vector as vec, helpers as h
+from ost.helpers import vector as vec, utils as h
 
 logger = logging.getLogger(__name__)
 

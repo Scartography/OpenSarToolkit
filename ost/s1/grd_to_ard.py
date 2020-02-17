@@ -70,7 +70,7 @@ import gdal
 import logging
 
 from os.path import join as opj
-from ost.helpers import helpers as h
+from ost.helpers import utils as h
 from ost.settings import OST_ROOT
 
 logger = logging.getLogger(__name__)
