@@ -233,6 +233,8 @@ def ard_to_ts(
                 max=mm_dict[stretch]['max'],
                 no_data=no_data
             )
+        with open(str(check_file), 'w') as file:
+            file.write('passed all tests \n')
         # build vrt of timeseries
         vrt_options = gdal.BuildVRTOptions(srcNodata=0, separate=True)
         gdal.BuildVRT(opj(out_dir, 'Timeseries.{}.{}.vrt'.format(product_suffix, pol)),
