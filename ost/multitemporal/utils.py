@@ -12,7 +12,7 @@ from ost.helpers import utils as h, raster as ras, vector as vec
 
 
 def create_timeseries_animation(
-        timeseries_folder,
+        track_ts_folder,
         product_list,
         out_folder,
         shrink_factor=1,
@@ -20,7 +20,7 @@ def create_timeseries_animation(
         add_dates=False
 ):
     nr_of_products = len(glob.glob(
-        opj(timeseries_folder, '*{}.tif'.format(product_list[0]))))
+        opj(track_ts_folder, '*{}.tif'.format(product_list[0]))))
     outfiles = []
     # for coherence it must be one less
     if 'coh.VV' in product_list or 'coh.VH' in product_list:
@@ -28,7 +28,7 @@ def create_timeseries_animation(
     # Iterate over the tifs from the timeseries
     for i in range(nr_of_products):
         filelist = [glob.glob(
-            opj(timeseries_folder, '{}.*{}*tif'.format(i + 1, product))
+            opj(track_ts_folder, '{}.*{}*tif'.format(i + 1, product))
         )[0]
                     for product in product_list
                     ]
@@ -45,9 +45,10 @@ def create_timeseries_animation(
             date=date
         )
         outfiles.append(opj(out_folder, '{}.{}.jpeg'.format(i+1, dates)))
+    out_gif_name = os.path.basename(track_ts_folder)+'_ts_animation.gif'
     # create gif
     with imageio.get_writer(
-            opj(out_folder, 'ts_animation.gif'),
+            opj(out_folder, out_gif_name),
             mode='I',
             duration=duration
     ) as writer:

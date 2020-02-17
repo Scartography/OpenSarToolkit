@@ -49,7 +49,6 @@ def test_sentinel_generic_class(some_bounds):
 def test_sentinel1_grd_batch(some_bounds):
     with TemporaryDirectory(dir=os.getcwd()) as temp, \
             TemporaryDirectory(dir=os.getcwd()) as dl_temp, \
-            TemporaryDirectory(dir=os.getcwd()) as tmp_temp, \
             TemporaryDirectory(dir=os.getcwd()) as inv_temp:
         sen1 = SenBatch(
             project_dir=temp,
