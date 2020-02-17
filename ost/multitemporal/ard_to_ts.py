@@ -120,7 +120,8 @@ def ard_to_ts(
         track,
         ard_params,
         pol,
-        product_suffix='TC'
+        product_suffix='TC',
+        no_data=0.0
 ):
     # get the track directory
     track_dir = opj(processing_dir, track)
@@ -207,108 +208,159 @@ def ard_to_ts(
                               )
         else:
             out_stack = temp_stack
-        outfile = None
         if product_suffix == 'coh':
-            # get slave and master Date
-            master_dates = [datetime.datetime.strptime(
-                os.path.basename(x).split('_')[3].split('.')[0],
-                '%d%b%Y') for x in glob.glob(
-                opj('{}.data'.format(out_stack), '*img'))]
-
-            slaves_dates = [datetime.datetime.strptime(
-                os.path.basename(x).split('_')[4].split('.')[0],
-                '%d%b%Y') for x in glob.glob(
-                opj('{}.data'.format(out_stack), '*img'))]
-            # sort them
-            master_dates.sort()
-            slaves_dates.sort()
-            # write them back to string for following loop
-            sorted_master_dates = [datetime.datetime.strftime(
-                ts, "%d%b%Y") for ts in master_dates]
-            sorted_slave_dates = [datetime.datetime.strftime(
-                ts, "%d%b%Y") for ts in slaves_dates]
-
-            i, outfiles = 1, []
-            for mst, slv in zip(sorted_master_dates, sorted_slave_dates):
-                in_master = datetime.datetime.strptime(mst, '%d%b%Y')
-                in_slave = datetime.datetime.strptime(slv, '%d%b%Y')
-
-                out_master = datetime.datetime.strftime(in_master, '%y%m%d')
-                out_slave = datetime.datetime.strftime(in_slave, '%y%m%d')
-                infile = glob.glob(opj('{}.data'.format(out_stack),
-                                       '*{}*{}_{}*img'.format(pol, mst, slv)))[0]
-
-                outfile = opj(
-                    out_dir,
-                    '{}.{}.{}.{}.{}.tif'.format(i,
-                                                out_master,
-                                                out_slave,
-                                                product_suffix,
-                                                pol
-                                                )
-                              )
-
-                ras.to_gtiff_clip_by_extend(
-                    infile,
-                    outfile,
-                    extent,
-                    to_db=to_db,
-                    datatype=ard_params['dtype_output'],
-                    min_value=mm_dict[stretch]['min'],
-                    max_value=mm_dict[stretch]['max'],
-                    no_data=0.0,
-                    description=True
-                )
-                # add ot a list for suBSequent vrt creation
-                outfiles.append(outfile)
-                i += 1
+            outfiles = _get_coh_ts(
+                in_stack=out_stack,
+                out_dir=out_dir,
+                polarization=pol,
+                product_suffix=product_suffix,
+                extent=extent,
+                to_db=to_db,
+                out_dtype=ard_params['dtype_output'],
+                min=mm_dict[stretch]['min'],
+                max=mm_dict[stretch]['max']
+            )
         else:
-            # get the dates of the files
-            dates = [datetime.datetime.strptime(x.split('_')[-1][:-4], '%d%b%Y')
-                     for x in glob.glob(opj('{}.data'.format(out_stack), '*img'))]
-            # sort them
-            dates.sort()
-            # write them back to string for following loop
-            sorted_date = [datetime.datetime.strftime(ts, "%d%b%Y")
-                           for ts in dates]
-
-            i, outfiles = 1, []
-            for date in sorted_date:
-                # restructure date to YYMMDD
-                in_date = datetime.datetime.strptime(date, '%d%b%Y')
-                out_date = datetime.datetime.strftime(in_date, '%Y%m%d')
-
-                infile = glob.glob(opj('{}.data'.format(out_stack),
-                                       '*{}*{}*img'.format(pol, date))
-                                   )[0]
-                # create outfile
-                outfile = opj(
-                    out_dir, '{}.{}.{}.{}.tif'.format(i, out_date, product_suffix, pol)
-                )
-
-                ras.to_gtiff_clip_by_extend(
-                    infile,
-                    outfile,
-                    extent,
-                    to_db=to_db,
-                    datatype=ard_params['dtype_output'],
-                    min_value=mm_dict[stretch]['min'],
-                    max_value=mm_dict[stretch]['max'],
-                    no_data=0.0
-                )
-                # add ot a list for subsequent vrt creation
-                outfiles.append(outfile)
-                i += 1
-
-        if outfile is None or not os.path.isfile(outfile):
-            raise RuntimeError('File %s was not created, something went wrong.', outfile)
-
-        with open(str(check_file), 'w') as file:
-            file.write('passed all tests \n')
-
+            outfiles = _get_regular_ts(
+                in_stack=out_stack,
+                out_dir=out_dir,
+                polarization=pol,
+                product_suffix=product_suffix,
+                extent=extent,
+                to_db=to_db,
+                out_dtype=ard_params['dtype_output'],
+                min=mm_dict[stretch]['min'],
+                max=mm_dict[stretch]['max'],
+                no_data=no_data
+            )
         # build vrt of timeseries
         vrt_options = gdal.BuildVRTOptions(srcNodata=0, separate=True)
         gdal.BuildVRT(opj(out_dir, 'Timeseries.{}.{}.vrt'.format(product_suffix, pol)),
                       outfiles,
                       options=vrt_options
                       )
+
+
+def _get_regular_ts(
+        in_stack,
+        out_dir,
+        polarization,
+        product_suffix='TC',
+        extent=None,
+        to_db=False,
+        out_dtype='float32',
+        min=0.000001,
+        max=1,
+        no_data=0.0
+):
+    # get the dates of the files
+    dates = [datetime.datetime.strptime(x.split('_')[-1][:-4], '%d%b%Y')
+             for x in glob.glob(opj('{}.data'.format(in_stack), '*img'))]
+    # sort them
+    dates.sort()
+    # write them back to string for following loop
+    sorted_date = [datetime.datetime.strftime(ts, "%d%b%Y")
+                   for ts in dates]
+
+    i, outfiles = 1, []
+    for date in sorted_date:
+        # restructure date to YYMMDD
+        in_date = datetime.datetime.strptime(date, '%d%b%Y')
+        out_date = datetime.datetime.strftime(in_date, '%Y%m%d')
+
+        infile = glob.glob(opj('{}.data'.format(in_stack),
+                               '*{}*{}*img'.format(polarization, date))
+                           )[0]
+        # create outfile
+        outfile = opj(
+            out_dir, '{}.{}.{}.{}.tif'.format(i, out_date, product_suffix, polarization)
+        )
+        logger.debug('Writing date %s to file %s', out_date, outfile)
+
+        ras.to_gtiff_clip_by_extend(
+            infile,
+            outfile,
+            extent,
+            to_db=to_db,
+            out_dtype=out_dtype,
+            min_value=min,
+            max_value=max,
+            no_data=no_data
+        )
+        if outfile is None or not os.path.isfile(outfile):
+            raise RuntimeError(
+                'File %s was not created, something went wrong.', outfile
+            )
+        # add ot a list for subsequent vrt creation
+        outfiles.append(outfile)
+        i += 1
+
+    return outfiles
+
+
+def _get_coh_ts(
+        in_stack,
+        out_dir,
+        polarization,
+        product_suffix='coh',
+        extent=None,
+        to_db=False,
+        out_dtype='float32',
+        min=0.000001,
+        max=1
+):
+    # get slave and master Date
+    master_dates = [datetime.datetime.strptime(
+        os.path.basename(x).split('_')[3].split('.')[0],
+        '%d%b%Y') for x in glob.glob(
+        opj('{}.data'.format(in_stack), '*img'))]
+
+    slaves_dates = [datetime.datetime.strptime(
+        os.path.basename(x).split('_')[4].split('.')[0],
+        '%d%b%Y') for x in glob.glob(
+        opj('{}.data'.format(in_stack), '*img'))]
+    # sort them
+    master_dates.sort()
+    slaves_dates.sort()
+    # write them back to string for following loop
+    sorted_master_dates = [datetime.datetime.strftime(
+        ts, "%d%b%Y") for ts in master_dates]
+    sorted_slave_dates = [datetime.datetime.strftime(
+        ts, "%d%b%Y") for ts in slaves_dates]
+
+    i, outfiles = 1, []
+    for mst, slv in zip(sorted_master_dates, sorted_slave_dates):
+        in_master = datetime.datetime.strptime(mst, '%d%b%Y')
+        in_slave = datetime.datetime.strptime(slv, '%d%b%Y')
+
+        out_master = datetime.datetime.strftime(in_master, '%Y%m%d')
+        out_slave = datetime.datetime.strftime(in_slave, '%Y%m%d')
+        infile = glob.glob(opj('{}.data'.format(in_stack),
+                               '*{}*{}_{}*img'.format(polarization, mst, slv)))[0]
+
+        outfile = opj(
+            out_dir,
+            '{}.{}.{}.{}.{}.tif'.format(i,
+                                        out_master,
+                                        out_slave,
+                                        product_suffix,
+                                        polarization
+                                        )
+        )
+
+        ras.to_gtiff_clip_by_extend(
+            infile,
+            outfile,
+            extent,
+            to_db=to_db,
+            datatype=out_dtype,
+            min_value=min,
+            max_value=max,
+            no_data=0.0,
+            description=True
+        )
+        # add ot a list for suBSequent vrt creation
+        outfiles.append(outfile)
+        i += 1
+
+    return outfiles

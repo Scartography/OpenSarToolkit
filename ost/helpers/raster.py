@@ -326,25 +326,32 @@ def to_gtiff_clip_by_extend(
         outfile,
         vector,
         to_db=False,
-        datatype='float32',
+        out_dtype='float32',
         rescale=True,
         min_value=0.000001,
         max_value=1,
         no_data=0.0,
         description=True
 ):
-    # import shapefile geometries if clip flag ok
-    with fiona.open(vector, 'r') as file:
-        features = [feature['geometry']
-                    for feature in file
-                    if feature['geometry']
-                    ]
-
-    # import raster
-    with rasterio.open(infile) as src:
-        out_image, out_transform = rasterio.mask.mask(src, features, crop=True)
-        out_meta = src.meta.copy()
-        out_image = np.ma.masked_where(out_image == no_data, out_image)
+    if os.path.isfile(vector):
+        # import shapefile geometries if clip flag ok
+        with fiona.open(vector, 'r') as file:
+            features = [feature['geometry']
+                        for feature in file
+                        if feature['geometry']
+                        ]
+        # import raster
+        with rasterio.open(infile) as src:
+            out_meta = src.meta.copy()
+            out_image, out_transform = rasterio.mask.mask(src, features, crop=True)
+            out_image = np.ma.masked_where(out_image == no_data, out_image)
+    else:
+        # import raster
+        with rasterio.open(infile) as src:
+            out_meta = src.meta.copy()
+            out_transform = src.transform
+            out_image = src.read()
+            out_image = np.ma.masked_where(out_image == no_data, out_image)
 
     # unmask array
     out_image = out_image.data
@@ -354,11 +361,11 @@ def to_gtiff_clip_by_extend(
         out_image = convert_to_db(out_image)
 
     if rescale:
-        # if we scale to another d
-        if datatype != 'float32':
-            if datatype == 'uint8':
+        # if we scale to another datatype (WIP: move it to another submodule)
+        if out_dtype != 'float32':
+            if out_dtype == 'uint8':
                 out_image = scale_to_int(out_image, min_value, max_value, 'uint8')
-            elif datatype == 'uint16':
+            elif out_dtype == 'uint16':
                 out_image = scale_to_int(out_image, min_value, max_value, 'uint16')
 
     out_meta.update({'driver': 'GTiff',
@@ -366,7 +373,7 @@ def to_gtiff_clip_by_extend(
                      'width': out_image.shape[2],
                      'transform': out_transform,
                      'nodata': no_data,
-                     'dtype': datatype,
+                     'dtype': out_dtype,
                      'tiled': True,
                      'blockxsize': 128,
                      'blockysize': 128
@@ -409,10 +416,10 @@ def visualise_rgb(filepath, shrink_factor=25):
 
 def get_min(file):
     mins = {
-        'BS.VV': -20,
-        'BS.VH': -25,
-        'BS.HH': -20,
-        'BS.HV': -25,
+        'TC.VV': -20,
+        'TC.VH': -25,
+        'TC.HH': -20,
+        'TC.HV': -25,
         'coh.VV': 0.1,
         'coh.VH': 0.1,
         'Alpha': 60,
@@ -426,10 +433,10 @@ def get_min(file):
 
 def get_max(file):
     maxs = {
-        'BS.VV': 0,
-        'BS.VH': -12,
-        'BS.HH': 0,
-        'BS.HV': -5,
+        'TC.VV': 0,
+        'TC.VH': -12,
+        'TC.HH': 0,
+        'TC.HV': -5,
         'coh.VV': 0.8,
         'coh.VH': 0.75,
         'Alpha': 80,
