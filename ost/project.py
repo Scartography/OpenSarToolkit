@@ -361,9 +361,13 @@ class Sentinel1Batch(Sentinel1):
         self.ard_type = ard_type
         self.ard_parameters = {}
         self.set_ard_parameters(ard_type)
-        self.timeseries_dir = opj(self.processing_dir, '*', 'Timeseries')
-        self.timescan_dir = opj(self.processing_dir, '*', 'Timescan')
-        self.animations_dir = opj(self.processing_dir, '*', 'Animations')
+        self.timeseries_dirs = [opj(self.processing_dir, track, 'Timeseries')
+                                for track in self.inventory.relativeorbit.unique()
+                                ]
+        self.timescan_dirs = [opj(self.processing_dir, track, 'Timescan')
+                              for track in self.inventory.relativeorbit.unique()
+                              ]
+        self.animations_dir = opj(self.processing_dir, 'Animations')
 
     # processing related functions
 
@@ -519,10 +523,9 @@ class Sentinel1Batch(Sentinel1):
                                      duration=1,
                                      add_dates=False
                                      ):
-        for track in self.inventory.relativeorbit.unique():
-            track_ts_folder = opj(self.timeseries_dir, track)
+        for ts_dir in self.timeseries_dirs:
             create_timeseries_animation(
-                track_ts_folder=track_ts_folder,
+                track_ts_folder=ts_dir,
                 product_list=['TC.VV', 'TC.VH'],
                 out_folder=self.animations_dir,
                 shrink_factor=shrink_factor,
