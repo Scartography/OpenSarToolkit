@@ -38,7 +38,7 @@ def test_ost_slc_to_ard(
         product.set_ard_parameters(ard_type)
         try:
             out_files = product.create_ard(
-                infile=product.get_path(processing_dir),
+                filelist=product.get_path(processing_dir),
                 out_dir=processing_dir,
                 out_prefix=scene_id+'_'+ard_type,
                 temp_dir=temp,
@@ -88,7 +88,7 @@ def test_ost_flat_slc_to_ard(
         product.set_ard_parameters(ard_type)
         try:
             out_files = product.create_ard(
-                infile=product.get_path(processing_dir),
+                filelist=product.get_path(processing_dir),
                 out_dir=processing_dir,
                 out_prefix=scene_id+'_'+ard_type,
                 temp_dir=temp,
@@ -138,7 +138,7 @@ def test_earth_engine_slc_to_ard(
         product.set_ard_parameters(ard_type)
         try:
             out_files = product.create_ard(
-                infile=product.get_path(processing_dir),
+                filelist=product.get_path(processing_dir),
                 out_dir=processing_dir,
                 out_prefix=scene_id+'_'+ard_type,
                 temp_dir=temp,
@@ -188,7 +188,7 @@ def test_ceos_slc_to_ard(
         product.set_ard_parameters(ard_type)
         try:
             out_files = product.create_ard(
-                infile=product.get_path(processing_dir),
+                filelist=product.get_path(processing_dir),
                 out_dir=processing_dir,
                 out_prefix=scene_id+'_'+ard_type,
                 temp_dir=temp,
@@ -238,7 +238,7 @@ def test_zhuo_slc_to_ard(
         product.set_ard_parameters(ard_type)
         try:
             out_files = product.create_ard(
-                infile=product.get_path(processing_dir),
+                filelist=product.get_path(processing_dir),
                 out_dir=processing_dir,
                 out_prefix=scene_id+'_'+ard_type,
                 temp_dir=temp,
