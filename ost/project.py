@@ -233,7 +233,6 @@ class Sentinel1(Generic):
         self.timescan_dirs = [opj(self.processing_dir, track, 'Timescan')
                               for track in self.inventory.relativeorbit.unique()
                               ]
-        self.animations_dir = opj(self.processing_dir, 'Animations')
 
     def read_inventory(self):
         '''Read the Sentinel-1 data inventory from a OST invetory shapefile
@@ -368,6 +367,8 @@ class Sentinel1Batch(Sentinel1):
         self.ard_type = ard_type
         self.ard_parameters = {}
         self.set_ard_parameters(ard_type)
+
+        self.animations_dir = opj(self.processing_dir, 'Animations')
 
     # processing related functions
     def to_ard(self, subset=None, overwrite=False):

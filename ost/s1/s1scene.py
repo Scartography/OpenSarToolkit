@@ -653,7 +653,7 @@ class Sentinel1Scene:
             filelist,
             out_dir,
             out_prefix,
-            temp_dir=os.getcwd(),
+            temp_dir=None,
             subset=None,
             polar='VV,VH,HH,HV',
             max_workers=int(os.cpu_count()/2)

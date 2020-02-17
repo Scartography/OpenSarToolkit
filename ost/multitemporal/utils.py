@@ -50,7 +50,7 @@ def create_timeseries_animation(
             date=date
         )
         outfiles.append(opj(out_folder, '{}.{}.jpeg'.format(i+1, dates)))
-    out_gif_name = os.path.basename(track_ts_folder)+'_ts_animation.gif'
+    out_gif_name = track_ts_folder.split('/')[-2]+'_ts_animation.gif'
     # create gif
     with imageio.get_writer(
             opj(out_folder, out_gif_name),
