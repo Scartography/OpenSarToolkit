@@ -876,12 +876,6 @@ def grd_to_ard(filelist,
         if return_code != 0:
             h.remove_folder_content(temp_dir)
             return return_code
-
-        for file in filelist:
-            h.delete_dimap(opj(temp_dir, '{}_imported'.format(
-                os.path.basename(str(file))[:-5])))
-            # delete slice assembly
-            h.delete_dimap(grd_import)
     # single scene case
     else:
         grd_import = opj(temp_dir, '{}_imported'.format(out_prefix))
@@ -937,14 +931,6 @@ def grd_to_ard(filelist,
         return return_code
 
     data_dir = glob.glob(opj(temp_dir, '{}*imported.data'.format(out_prefix)))
-    if isinstance(data_dir, list):
-        for d in data_dir:
-            if d != [] and os.path.isdir(d):
-                h.delete_dimap(str(d)[:-5])
-    else:
-        if d != [] and os.path.isdir(data_dir):
-            h.delete_dimap(str(data_dir)[:-5])
-
     infile = opj(temp_dir, '{}_{}.dim'.format(out_prefix, product_type))
     # -------------------------------------------
     # in case we want to apply Speckle filtering
