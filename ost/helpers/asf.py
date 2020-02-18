@@ -244,7 +244,7 @@ def _check_downloaded_files(inventory_df, download_dir, downloaded_scenes):
         for scene in scenes:
             scene = S1Scene(scene)
             filepath = scene._download_path(download_dir)
-            if os.path.exists('{}.downloaded'.format(filepath)):
+            if not os.path.exists('{}.downloaded'.format(filepath)):
                 scenes.remove(scene.scene_id)
                 inventory_df = inventory_df[
                     inventory_df.identifier != scene.scene_id
