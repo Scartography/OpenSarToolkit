@@ -324,14 +324,18 @@ class Sentinel1(Generic):
         if not download_df.any().any():
             logger.debug('INFO: All scenes are ready for being processed.')    
         else:
-            logger.debug('INFO: One or more of your scenes need to be downloaded.')
-            s1_dl.download_sentinel1(download_df,
-                                     self.download_dir,
-                                     mirror=mirror,
-                                     concurrent=concurrent,
-                                     uname=uname,
-                                     pword=pword
-                                     )
+            logger.debug(
+                'INFO: One or more of your scenes need to be downloaded.'
+            )
+            self.download_dir, self.inventory_df = s1_dl.download_sentinel1(
+                download_df,
+                self.download_dir,
+                mirror=mirror,
+                concurrent=concurrent,
+                uname=uname,
+                pword=pword
+            )
+        return self
 
     def plot_inventory(self, inventory_df=None, transperancy=0.05, show=False):
         if inventory_df is None:
