@@ -335,9 +335,12 @@ class Sentinel1(Generic):
                 uname=uname,
                 pword=pword
             )
-        for missing in self.missing_scenes:
-            if missing in inventory_df.identifier:
-                inventory_df = inventory_df[inventory_df.identifier != missing]
+        for id in inventory_df.identifier:
+            for missing in self.missing_scenes:
+                if id.lower() in missing.lower():
+                    self.inventory = inventory_df[
+                        inventory_df.identifier != id
+                    ]
         return self
 
     def plot_inventory(self, inventory_df=None, transperancy=0.05, show=False):
