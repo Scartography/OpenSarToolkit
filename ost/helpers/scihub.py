@@ -268,6 +268,12 @@ def s1_download(argument_list):
     # check response
     if response.status_code == 401:
         raise ValueError(' ERROR: Username/Password are incorrect.')
+    elif response.status_code == 404:
+        logger.debug(
+            'Product %s missing from the archive, continuing.',
+            filename.split('/')[-1]
+        )
+        return filename.split('/')[-1]
     elif response.status_code != 200:
         logger.debug(
             'ERROR: Something went wrong, will try again in 30 seconds.'
@@ -293,9 +299,8 @@ def s1_download(argument_list):
         first_byte = os.path.getsize(filename)
     else:
         first_byte = 0
-
     if first_byte >= total_length:
-        return total_length
+        return str('{}.downloaded'.format(filename))
 
     zip_test = 1
     while zip_test is not None and zip_test <= 10:
@@ -326,6 +331,7 @@ def s1_download(argument_list):
             logger.debug('INFO: {} passed the zip test.'.format(filename))
             with open(str('{}.downloaded'.format(filename)), 'w') as file:
                 file.write('successfully downloaded \n')
+    return str('{}.downloaded'.format(filename))
 
 
 def scihub_batch_download(
@@ -341,7 +347,7 @@ def scihub_batch_download(
         uname=uname,
         pword=pword
     )
-
+    missing_scenes = []
     executor_type = 'concurrent_threads'
     executor = Executor(executor=executor_type, max_workers=concurrent)
     for task in executor.as_completed(
@@ -350,7 +356,9 @@ def scihub_batch_download(
             fargs=()
 
     ):
-        task.result()
+        downloaded_string = task.result()
+        if not downloaded_string.endswith('downloaded'):
+            missing_scenes.append(downloaded_string)
 
     downloaded_scenes = glob.glob(
         opj(download_dir, 'SAR', '*', '20*', '*', '*',
@@ -361,8 +369,8 @@ def scihub_batch_download(
                                          downloaded_scenes
                                          )
     if check_flag is False:
-        raise RuntimeError(
-            'Something went wrong at the batch download of S1 products'
+        logger.debug(
+            'Some products are missing from the archive: %s', missing_scenes
         )
 
 

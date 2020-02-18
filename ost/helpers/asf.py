@@ -132,9 +132,7 @@ def s1_download(argument_list, uname, pword):
                 'Product %s missing from the archive, continuing.',
                 filename.split('/')[-1]
             )
-            with open(str('{}.downloaded'.format(filename)), 'w') as file:
-                file.write('successfully downloaded \n')
-            return 'empty'
+            return filename.split('/')[-1]
         else:
             raise e
     except urllib.error.URLError as e:
@@ -175,11 +173,12 @@ def s1_download(argument_list, uname, pword):
             if os.path.exists(filename):
                 os.remove(filename)
                 first_byte = 0
-            # otherwise we change the status to True
+        # otherwise we change the status to True
         else:
             logger.debug('INFO: {} passed the zip test.'.format(filename))
             with open(str('{}.downloaded'.format(filename)), 'w') as file:
                 file.write('successfully downloaded \n')
+    return str('{}.downloaded'.format(filename))
 
 
 def asf_batch_download(
@@ -191,6 +190,7 @@ def asf_batch_download(
 ):
     # create list of scenes
     to_dl_list = _prepare_scenes_to_dl(inventory_df, download_dir)
+    missing_scenes = []
     executor_type = 'concurrent_threads'
     executor = Executor(executor=executor_type, max_workers=concurrent)
     for task in executor.as_completed(
@@ -201,18 +201,20 @@ def asf_batch_download(
                    )
 
     ):
-        task.result()
+        downloaded_string = task.result()
+        if not downloaded_string.endswith('downloaded'):
+            missing_scenes.append(downloaded_string)
 
     downloaded_scenes = glob.glob(
         opj(download_dir, 'SAR', '*', '20*', '*', '*',
             '*.zip.downloaded')
     )
     check_flag = _check_downloaded_files(
-        inventory_df, download_dir, downloaded_scenes
+        inventory_df, download_dir, downloaded_scenes, missing_scenes
     )
     if check_flag is False:
-        raise RuntimeError(
-            'Something went wrong at the batch download of S1 products'
+        logger.debug(
+            'Some products are missing from the archive: %s', missing_scenes
         )
 
 
@@ -239,10 +241,8 @@ def _check_downloaded_files(inventory_df, download_dir, downloaded_scenes):
     else:
         check = False
         for scene in scenes:
-
             scene = S1Scene(scene)
             filepath = scene._download_path(download_dir)
-
             if os.path.exists('{}.downloaded'.format(filepath)):
                 scenes.remove(scene.scene_id)
     return check
