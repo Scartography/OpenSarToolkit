@@ -125,11 +125,15 @@ def s1_download(argument_list, uname, pword):
     # submit the request using the session
     try:
         response = urlreq.urlopen(url=url)
-    # raise an exception in case of http errors
+        # raise an exception in case of http errors
     except urllib.error.HTTPError as e:
-        # Raise error (e.g. 404, 501, ...)
-        # ...
-        raise e
+        if e.code == 404:
+            logger.debug(
+                'Product %s missing from the archive, continuing',
+                filename.split('/')[-1]
+            )
+        else:
+            raise e
     except urllib.error.URLError as e:
         # Not an HTTP-specific error (e.g. connection refused)
         # ...
