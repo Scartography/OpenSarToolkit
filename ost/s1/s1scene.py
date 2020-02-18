@@ -142,6 +142,7 @@ class Sentinel1Scene:
         self.download_dir, self.inventory_df = s1_dl.download_sentinel1(
             df, download_dir, mirror=mirror
         )
+        return self
 
     # location of file (including diases)
     def _download_path(self, download_dir, mkdir=False):
