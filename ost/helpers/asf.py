@@ -209,7 +209,7 @@ def asf_batch_download(
         opj(download_dir, 'SAR', '*', '20*', '*', '*',
             '*.zip.downloaded')
     )
-    check_flag, inventory_df = _check_downloaded_files(
+    check_flag = _check_downloaded_files(
         inventory_df, download_dir, downloaded_scenes
     )
     if check_flag is False:
