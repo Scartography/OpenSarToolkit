@@ -40,6 +40,7 @@ from shapely.wkt import dumps, loads
 
 from ost.helpers.db import pgHandler
 from ost.helpers import scihub
+from ost.errors import EmptySearchError
 
 logger = logging.getLogger(__name__)
 
@@ -162,12 +163,10 @@ def _query_scihub(apihub, opener, query):
         # retrieve next page and set index up by 99 entries
         next_page = scihub.next_page(dom)
         index += rows
-
     return geo_df
 
 
 def _to_shapefile(gdf, outfile, append=False):
-
     # check if file is there
     if os.path.isfile(outfile):
         # in case we want to append, we load the old one and add the new one
@@ -182,7 +181,6 @@ def _to_shapefile(gdf, outfile, append=False):
                 'swathidentifier', 'ingestiondate',
                 'sensoroperationalmode', 'geometry'
             ]
-
             # get existing geodataframe from file
             old_df = gpd.read_file(outfile)
             old_df.columns = columns
@@ -194,17 +192,15 @@ def _to_shapefile(gdf, outfile, append=False):
 
             # remove duplicate entries
             gdf.drop_duplicates(subset='identifier', inplace=True)
-
-        # remove old file
-        os.remove(outfile)
-        os.remove('{}.cpg'.format(outfile[:-4]))
-        os.remove('{}.prj'.format(outfile[:-4]))
-        os.remove('{}.shx'.format(outfile[:-4]))
-        os.remove('{}.dbf'.format(outfile[:-4]))
-
+        else:
+            # remove old file
+            os.remove(outfile)
+            os.remove('{}.cpg'.format(outfile[:-4]))
+            os.remove('{}.prj'.format(outfile[:-4]))
+            os.remove('{}.shx'.format(outfile[:-4]))
+            os.remove('{}.dbf'.format(outfile[:-4]))
     # calculate new index
     gdf.insert(loc=0, column='id', value=range(1, 1 + len(gdf)))
-
     # write to new file
     gdf.to_file(outfile)
     return outfile
@@ -269,11 +265,13 @@ def _to_postgis(gdf, db_connect, outtable):
             maxid += 1
         else:
             logger.debug('Scene {} already exists within table {}.'.format(identifier,
-                                                                    outtable))
+                                                                           outtable)
+                         )
 
     logger.debug('INFO: Inserted {} entries into {}.'.format(len(gdf), outtable))
     logger.debug('INFO: Table {} now contains {} entries.'.format(outtable,
-                                                            maxid - 1))
+                                                                  maxid - 1)
+                 )
     logger.debug('INFO: Optimising database table.')
 
     # drop index if existent
@@ -297,11 +295,10 @@ def check_availability(inventory_gdf, download_dir, data_mount):
     '''
     
     from ost import Sentinel1Scene
-    
     # add download path, or set to None if not found
     inventory_gdf['download_path'] = inventory_gdf.identifier.apply(
-        lambda row: Sentinel1Scene(row).get_path(download_dir, data_mount))
-    
+        lambda row: Sentinel1Scene(row).get_path(download_dir, data_mount)
+    )
     return inventory_gdf
 
 
@@ -324,10 +321,13 @@ def scihub_catalogue(
     opener = scihub.connect(base_url, uname, pword)
     action = 'search?q='
     apihub = base_url + action
-
     # get the catalogue in a dict
     gdf = _query_scihub(apihub, opener, query_string)
-
+    if gdf.empty:
+        raise EmptySearchError(
+            'Nothing found, either something is wrong with your credentials'
+            ' or scihub is down, or wrong search are set!'
+        )
     # define output
     if output[-7:] == ".sqlite":
         logger.debug('INFO: writing to an sqlite file')
@@ -344,7 +344,7 @@ def scihub_catalogue(
 
 if __name__ == "__main__":
     import argparse
-    from ost.helpers import helpers
+    from ost.helpers import utils
 
     # get the current date
     NOW = datetime.datetime.now()
@@ -384,12 +384,12 @@ if __name__ == "__main__":
     PARSER.add_argument("-b", "--begindate",
                         help="The Start Date (format: YYYY-MM-DD) ",
                         default="2014-10-01",
-                        type=lambda x: helpers.is_valid_date(PARSER, x)
+                        type=lambda x: utils.is_valid_date(PARSER, x)
                         )
     PARSER.add_argument("-e", "--enddate",
                         help="The End Date (format: YYYY-MM-DD)",
                         default=NOW,
-                        type=lambda x: helpers.is_valid_date(PARSER, x)
+                        type=lambda x: utils.is_valid_date(PARSER, x)
                         )
     PARSER.add_argument("-t", "--producttype",
                         help="The Product Type (RAW, SLC, GRD, *) ",

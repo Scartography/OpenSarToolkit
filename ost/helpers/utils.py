@@ -66,8 +66,13 @@ def gpt_path():
                 break
 
     if gptfile is None:
-        gptfile = os.getenv('GPT_PATH')
-        os.path.isfile(gptfile)
+        try:
+            gptfile = os.getenv('GPT_PATH')
+            if gptfile is None:
+                gptfile = shutil.which('gpt')
+            os.path.isfile(gptfile)
+        except:
+            logger.debug('No GPT found in ENV Varib!')
 
     if not gptfile:
         gptfile = input('Please provide the full path to the SNAP'
@@ -81,7 +86,6 @@ def gpt_path():
         logger.debug('ERROR: path to gpt file is incorrect. No such file.')
         sys.exit()
 
-    # logger.debug('INFO: using SNAP CL executable at {}'.format(gptfile))
     return gptfile
 
 
@@ -123,7 +127,6 @@ def remove_folder_content(folder):
     Args:
         folder: the folder, where everything should be deleted
     '''
-
     for root, dirs, files in os.walk(folder):
         for f in files:
             os.unlink(os.path.join(root, f))
@@ -140,7 +143,6 @@ def run_command(command, logfile, elapsed=True, silent=False):
         silent (bool): if you want to shut GPT up or not
 
     '''
-
     currtime = time.time()
     if silent:
         dev_null = open(os.devnull, 'w')
@@ -165,7 +167,6 @@ def run_command(command, logfile, elapsed=True, silent=False):
         with open(str(logfile), 'w') as file:
             for line in process.stderr.decode().splitlines():
                 file.write('{}\n'.format(line))
-
     if elapsed:
         timer(currtime)
 
@@ -214,36 +215,31 @@ def move_dimap(infile_prefix, outfile_prefix):
 
 
 def check_out_dimap(dimap_prefix, test_stats=True):
-
     return_code = 0
-
     # check if both dim and data exist, else return
     if not os.path.isfile('{}.dim'.format(dimap_prefix)):
         return 666
-
     if not os.path.isdir('{}.data'.format(dimap_prefix)):
         return 666
 
     # check for file size of the dim file
     dim_size_in_mb = os.path.getsize('{}.dim'.format(dimap_prefix)) / 1048576
-
-    if dim_size_in_mb < 0.2:
+    if dim_size_in_mb < 0.1:
         return 666
 
     for file in glob.glob(opj('{}.data'.format(dimap_prefix), '*.img')):
-
         # check size
         data_size_in_mb = os.path.getsize(file) / 1048576
 
-        if data_size_in_mb < 0.2:
-            logger.debug('data small')
+        if data_size_in_mb < 0.1:
+            logger.debug(
+                'BEAM DIMAP .data small of file %s', '{}.dim'.format(dimap_prefix)
+            )
             return 666
-
         if test_stats:
             # open the file
             ds = gdal.Open(file)
             stats = ds.GetRasterBand(1).GetStatistics(0, 1)
-
             # check for mean value of layer
             if stats[2] == 0:
                 return 666
@@ -255,21 +251,18 @@ def check_out_dimap(dimap_prefix, test_stats=True):
             # if difference ofmin and max is 0
             if stats[1] - stats[0] == 0:
                 return 666
-
     return return_code
 
 
 def check_out_tiff(file, test_stats=True):
-
     return_code = 0
-
     # check if both dim and data exist, else return
     if not os.path.isfile(file):
         return 666
 
     # check for file size of the dim file
     tiff_size_in_mb = os.path.getsize(file) / 1048576
-    if tiff_size_in_mb < 0.2:
+    if tiff_size_in_mb < 0.1:
         return 666
 
     if test_stats:
@@ -288,7 +281,6 @@ def check_out_tiff(file, test_stats=True):
         # if difference ofmin and max is 0
         if stats[1] - stats[0] == 0:
             return 666
-
     return return_code
 
 
@@ -312,7 +304,6 @@ def resolution_in_degree(latitude, meters):
     '''Convert resolution in meters to degree based on Latitude
 
     '''
-
     earth_radius = 6378137
     degrees_to_radians = math.pi/180.0
     radians_to_degrees = 180.0/math.pi
@@ -322,7 +313,7 @@ def resolution_in_degree(latitude, meters):
     return (meters/r)*radians_to_degrees
 
 
-def zip_s1_safe_dir(dir_path, zip_path, product_id):
+def _zip_s1_safe_dir(dir_path, zip_path, product_id):
     zipf = zipfile.ZipFile(zip_path, mode='w')
     len_dir = len(dir_path)
     for root, _, files in os.walk(dir_path):
@@ -332,9 +323,10 @@ def zip_s1_safe_dir(dir_path, zip_path, product_id):
             if '.downloaded' not in zip_path:
                 zipf.write(file_path, product_id+'.SAFE'+file_path[len_dir:])
     zipf.close()
+    return zip_path
 
 
-def _slc_zip_to_processing_dir(
+def _product_zip_to_processing_dir(
         processing_dir,
         product,
         product_path
@@ -347,17 +339,24 @@ def _slc_zip_to_processing_dir(
                                  product.day
                                  )
     os.makedirs(download_path, exist_ok=True)
-
+    if os.path.isdir(product_path):
+        product_path = _zip_s1_safe_dir(
+            dir_path=product_path,
+            zip_path=opj(
+                processing_dir, os.path.basename(product_path)+'.zip'
+            ),
+            product_id=product.scene_id
+        )
     if not os.path.exists(
             os.path.join(download_path, os.path.basename(product_path))
     ):
         shutil.copy(product_path, download_path)
-        with open(
-                os.path.join(
-                    download_path, os.path.basename(product_path)
-                )+'.downloaded', 'w'
-        ) as zip_dl:
-            zip_dl.write('1')
+    with open(
+            os.path.join(
+                download_path, os.path.basename(product_path)
+            )+'.downloaded', 'w'
+    ) as zip_dl:
+        zip_dl.write('1')
 
 
 def execute_ard(
@@ -423,3 +422,34 @@ class TqdmUpTo(tqdm):
             self.total = tsize
         # will also set self.n = b * bsize
         self.update(b * bsize - self.n)
+
+
+def _create_processing_dict(inventory_df):
+    dict_scenes = {}
+    # get relative orbits and loop through each
+    tracklist = inventory_df['relativeorbit'].unique()
+    for track in tracklist:
+        # initialize an empty list that will be filled by
+        # list of scenes per acq. date
+        all_ids = []
+        # get acquisition dates and loop through each
+        acquisition_dates = inventory_df['acquisitiondate'][
+            inventory_df['relativeorbit'] == track].unique()
+
+        # loop through dates
+        for acquisition_date in acquisition_dates:
+            # get the scene ids per acquisition_date and write into a list
+            single_id = []
+            single_id.append(
+                inventory_df['identifier'][
+                    (inventory_df['relativeorbit'] == track) &
+                    (inventory_df['acquisitiondate'] == acquisition_date)
+                    ].tolist())
+
+            # append the list of scenes to the list of scenes per track
+            all_ids.append(single_id[0])
+
+        # add this list to the dctionary and associate the track number
+        # as dict key
+        dict_scenes[track] = all_ids
+    return dict_scenes

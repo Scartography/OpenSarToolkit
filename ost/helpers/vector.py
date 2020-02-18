@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 from functools import partial
 
 import ogr
@@ -13,6 +14,8 @@ from shapely.wkt import loads
 from shapely.geometry import Point, Polygon, mapping, shape
 from fiona import collection
 from fiona.crs import from_epsg
+
+import matplotlib.pyplot as plt
 
 logger = logging.getLogger(__name__)
 
@@ -353,29 +356,30 @@ def buffer_shape(infile, outfile, buffer=None):
                 })
 
 
-def plot_inventory(aoi, inventory_df, transperancy=0.05):
+def gdf_to_json_geometry(gdf):
+    """Function to parse features from GeoDataFrame in such a manner
+       that rasterio wants them"""
+    geojson = json.loads(gdf.to_json())
+    return [feature['geometry'] for feature in geojson['features']
+            if feature['geometry']]
 
-    import matplotlib.pyplot as plt
 
+def plot_inventory(aoi, inventory_df, transperancy=0.05, show=False):
     # load world borders for background
     world = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
-
     # import aoi as gdf
     aoi_gdf = wkt_to_gdf(aoi)
-
     # get bounds of AOI
     bounds = inventory_df.geometry.bounds
-
     # get world map as base
     base = world.plot(color='lightgrey', edgecolor='white')
-
     # plot aoi
     aoi_gdf.plot(ax=base, color='None', edgecolor='black')
-
     # plot footlogger.debugs
     inventory_df.plot(ax=base, alpha=transperancy)
-
     # set bounds
     plt.xlim([bounds.minx.min()-2, bounds.maxx.max()+2])
     plt.ylim([bounds.miny.min()-2, bounds.maxy.max()+2])
     plt.grid(color='grey', linestyle='-', linewidth=0.2)
+    if show:
+        plt.show()

@@ -24,8 +24,7 @@ def ard_types():
 def s1_grd_notnr():
     return os.path.join(
         CACHE_DIR,
-        'S1B_IW_GRDH_1SDV_20180813T054020_20180813T054045_012240_0168D6_B775',
-        'manifest.safe'
+        'S1B_IW_GRDH_1SDV_20180813T054020_20180813T054045_012240_0168D6_B775'
     )
 
 
@@ -59,7 +58,7 @@ def s1_slc_ost_slave(s1_slc_slave):
 
 @pytest.fixture
 def s1_grd_notnr_ost_product(s1_grd_notnr):
-    scene_id = s1_grd_notnr.split('/')[-2]
+    scene_id = s1_grd_notnr.split('/')[-1]
     return (scene_id, Sentinel1Scene(scene_id))
 
 

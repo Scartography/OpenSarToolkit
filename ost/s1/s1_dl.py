@@ -27,7 +27,7 @@ def restore_download_dir(input_directory, download_dir):
 
     '''
     
-    from ost.helpers import helpers as h
+    from ost.helpers import utils as h
     
     for scene_in in glob.glob(opj(input_directory, '*zip')):
 

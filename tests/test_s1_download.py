@@ -1,8 +1,9 @@
 import os
+import pytest
 import pandas as pd
 from tempfile import TemporaryDirectory
 
-from ost.helpers.helpers import check_zipfile
+from ost.helpers.utils import check_zipfile
 from ost.helpers.asf import check_connection as check_connection_asf
 from ost.helpers.scihub import check_connection as check_connection_scihub, connect
 from ost.s1.s1_dl import download_sentinel1
@@ -55,6 +56,7 @@ def test_esa_scihub_download(s1_grd_notnr_ost_product, mirror=1):
         assert return_code is None
 
 
+@pytest.mark.skip(reason="ASF download is tested in the test_project batch whatever!")
 def test_asf_download(s1_grd_notnr_ost_product, mirror=2):
     herbert_uname = HERBERT_USER['uname']
     herbert_password = HERBERT_USER['asf_pword']
@@ -68,7 +70,7 @@ def test_asf_download(s1_grd_notnr_ost_product, mirror=2):
             uname=herbert_uname,
             pword=herbert_password
         )
-        from ost.helpers.helpers import check_zipfile
+        from ost.helpers.utils import check_zipfile
         product_path = s1_grd_notnr_ost_product[1].get_path(download_dir=download_dir,
                                                             data_mount='/eodata'
                                                             )

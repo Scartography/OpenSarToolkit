@@ -15,8 +15,8 @@ import itertools
 import gdal
 import geopandas as gpd
 
-from ost.helpers import scihub, vector as vec, raster as ras, helpers as h
-from ost.s1 import burst_to_ard, ts
+from ost.helpers import scihub, vector as vec, raster as ras, utils as h
+from ost.s1 import burst_to_ard, timeseries
 from ost import Sentinel1Scene as S1Scene
 
 logger = logging.getLogger(__name__)
@@ -271,7 +271,7 @@ def _ard_to_ts(burst_inventory, processing_dir, temp_dir,
     list_of_scenes = glob.glob(opj(burst_dir, '20*', '*data*', '*img'))
     list_of_scenes = [x for x in list_of_scenes if 'layover'not in x]
     extent = opj(burst_dir, '{}.extent.shp'.format(burst))
-    ts.mt_extent(list_of_scenes, extent, temp_dir, buffer=-0.0018)
+    timeseries.mt_extent(list_of_scenes, extent, temp_dir, buffer=-0.0018)
 
     # remove inital extent
     for file in glob.glob(opj(burst_dir, 'tmp*')):
@@ -282,7 +282,7 @@ def _ard_to_ts(burst_inventory, processing_dir, temp_dir,
         list_of_scenes = glob.glob(opj(burst_dir, '20*', '*data*', '*img'))
         list_of_layover = [x for x in list_of_scenes if 'layover'in x]
         out_ls = opj(burst_dir, '{}.ls_mask.tif'.format(burst))
-        ts.mt_layover(list_of_layover, out_ls, temp_dir, extent=extent)
+        timeseries.mt_layover(list_of_layover, out_ls, temp_dir, extent=extent)
         logger.debug('INFO: Our common layover mask is located at {}'.format(
               out_ls))
 
@@ -598,15 +598,15 @@ def _timeseries_to_timescan(burst_inventory, processing_dir, temp_dir,
 
             start = time.time()
             if 'BS.'in timescan_prefix:    # backscatter
-                ts.mt_metrics(timeseries, timescan_prefix, metrics,
-                              rescale_to_datatype=True,
-                              to_power=to_db,
-                              outlier_removal=outlier_removal)
+                timeseries.mt_metrics(timeseries, timescan_prefix, metrics,
+                                      rescale_to_datatype=True,
+                                      to_power=to_db,
+                                      outlier_removal=outlier_removal)
             else:   # non-backscatter
-                ts.mt_metrics(timeseries, timescan_prefix, metrics,
-                              rescale_to_datatype=False,
-                              to_power=False,
-                              outlier_removal=outlier_removal)
+                timeseries.mt_metrics(timeseries, timescan_prefix, metrics,
+                                      rescale_to_datatype=False,
+                                      to_power=False,
+                                      outlier_removal=outlier_removal)
 
             h.timer(start)
 

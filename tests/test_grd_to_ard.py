@@ -4,7 +4,7 @@ import rasterio
 from shapely.geometry import box
 from tempfile import TemporaryDirectory
 
-from ost.helpers.helpers import zip_s1_safe_dir
+from ost.helpers.utils import _zip_s1_safe_dir
 
 
 def test_ost_grd_to_ard(
@@ -26,19 +26,18 @@ def test_ost_grd_to_ard(
                                      product.day
                                      )
         os.makedirs(download_path, exist_ok=True)
-        zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
-                        os.path.join(download_path, scene_id+'.zip.downloaded'),
-                        scene_id
-                        )
-        zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
-                        os.path.join(download_path, scene_id+'.zip'),
-                        scene_id
-                        )
-
+        _zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
+                         os.path.join(download_path, scene_id+'.zip.downloaded'),
+                         scene_id
+                         )
+        _zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
+                         os.path.join(download_path, scene_id+'.zip'),
+                         scene_id
+                         )
         product.set_ard_parameters(ard_type)
         try:
             out_files = product.create_ard(
-                infile=product.get_path(processing_dir),
+                filelist=[product.get_path(processing_dir)],
                 out_dir=processing_dir,
                 out_prefix=scene_id+'_'+ard_type,
                 temp_dir=temp,
@@ -77,19 +76,19 @@ def test_ost_flat_grd_to_ard(
                                      product.day
                                      )
         os.makedirs(download_path, exist_ok=True)
-        zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
-                        os.path.join(download_path, scene_id+'.zip.downloaded'),
-                        scene_id
-                        )
-        zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
-                        os.path.join(download_path, scene_id+'.zip'),
-                        scene_id
-                        )
+        _zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
+                         os.path.join(download_path, scene_id+'.zip.downloaded'),
+                         scene_id
+                         )
+        _zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
+                         os.path.join(download_path, scene_id+'.zip'),
+                         scene_id
+                         )
 
         product.set_ard_parameters(ard_type)
         try:
             out_files = product.create_ard(
-                infile=product.get_path(processing_dir),
+                filelist=[product.get_path(processing_dir)],
                 out_dir=processing_dir,
                 out_prefix=scene_id+'_'+ard_type,
                 temp_dir=temp,
@@ -128,11 +127,11 @@ def test_ceos_grd_to_ard(
                                      product.day
                                      )
         os.makedirs(download_path, exist_ok=True)
-        zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
+        _zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
                         os.path.join(download_path, scene_id+'.zip.downloaded'),
                         scene_id
                         )
-        zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
+        _zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
                         os.path.join(download_path, scene_id+'.zip'),
                         scene_id
                         )
@@ -140,7 +139,7 @@ def test_ceos_grd_to_ard(
         product.set_ard_parameters(ard_type)
         try:
             out_files = product.create_ard(
-                infile=product.get_path(processing_dir),
+                filelist=[product.get_path(processing_dir)],
                 out_dir=processing_dir,
                 out_prefix=scene_id+'_'+ard_type,
                 temp_dir=temp,
@@ -179,11 +178,11 @@ def test_earth_engine_grd_to_ard(
                                      product.day
                                      )
         os.makedirs(download_path, exist_ok=True)
-        zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
+        _zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
                         os.path.join(download_path, scene_id+'.zip.downloaded'),
                         scene_id
                         )
-        zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
+        _zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
                         os.path.join(download_path, scene_id+'.zip'),
                         scene_id
                         )
@@ -191,7 +190,7 @@ def test_earth_engine_grd_to_ard(
         product.set_ard_parameters(ard_type)
         try:
             out_files = product.create_ard(
-                infile=product.get_path(processing_dir),
+                filelist=[product.get_path(processing_dir)],
                 out_dir=processing_dir,
                 out_prefix=scene_id+'_'+ard_type,
                 temp_dir=temp,
@@ -230,11 +229,11 @@ def test_zhuo_grd_to_ard(
                                      product.day
                                      )
         os.makedirs(download_path, exist_ok=True)
-        zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
+        _zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
                         os.path.join(download_path, scene_id+'.zip.downloaded'),
                         scene_id
                         )
-        zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
+        _zip_s1_safe_dir(os.path.dirname(s1_grd_notnr),
                         os.path.join(download_path, scene_id+'.zip'),
                         scene_id
                         )
@@ -242,7 +241,7 @@ def test_zhuo_grd_to_ard(
         product.set_ard_parameters(ard_type)
         try:
             out_files = product.create_ard(
-                infile=product.get_path(processing_dir),
+                filelist=[product.get_path(processing_dir)],
                 out_dir=processing_dir,
                 out_prefix=scene_id+'_'+ard_type,
                 temp_dir=temp,

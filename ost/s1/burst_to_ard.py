@@ -8,7 +8,7 @@ import warnings
 
 from rasterio.errors import NotGeoreferencedWarning
 
-from ost.helpers import helpers as h
+from ost.helpers import utils as h
 from ost.settings import SNAP_S1_RESAMPLING_METHODS, OST_ROOT
 
 logger = logging.getLogger(__name__)
@@ -573,6 +573,13 @@ def burst_to_ard(
         remove_slave_import (bool):
 
     '''
+    if len(master_file) != 1 and isinstance(master_file, list) \
+            or master_file == '' or master_file is None:
+        raise RuntimeError('No or invalid file in swath %s burst %s, input: %s',
+                           swath, master_burst_id, master_file
+                           )
+    if isinstance(master_file, list):
+        master_file = master_file[0]
 
     # Check for empty spaces in prefix
     out_prefix = out_prefix.replace(' ', '_')

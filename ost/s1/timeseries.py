@@ -6,20 +6,25 @@ import glob
 import time
 import logging
 from datetime import datetime
+from tempfile import TemporaryDirectory
 
 import gdal
 import rasterio
 import numpy as np
 from scipy import stats
 
-from ost.helpers import helpers as h, raster as ras, vector as vec
+from ost.helpers import utils as h, raster as ras, vector as vec
 
 logger = logging.getLogger(__name__)
 
 
-def create_stack(filelist, out_stack, logfile,
-                 polarisation=None, pattern=None
-                 ):
+def create_grd_stack(
+        filelist,
+        out_stack,
+        logfile,
+        polarisation='VV,VH',
+        pattern=None
+):
     '''
 
     :param filelist: list of single Files (space separated)
@@ -34,6 +39,8 @@ def create_stack(filelist, out_stack, logfile,
     rootpath = imp.find_module('ost')[1]
 
     logger.debug("INFO: Creating multi-temporal stack of images")
+    if isinstance(filelist, list):
+        filelist = ','.join(filelist)
     if pattern:
         graph = opj(rootpath, 'graphs', 'S1_TS', '1_BS_Stacking_HAalpha.xml')
         command = '{} {} -x -q {} -Pfilelist={} -PbandPattern=\'{}.*\'\
@@ -58,7 +65,11 @@ def create_stack(filelist, out_stack, logfile,
     return return_code
 
 
-def mt_speckle_filter(in_stack, out_stack, logfile):
+def mt_speckle_filter(
+        in_stack,
+        out_stack,
+        logfile
+):
     '''
     '''
 
@@ -86,7 +97,11 @@ def mt_speckle_filter(in_stack, out_stack, logfile):
     return return_code
 
 
-def mt_layover(filelist, outfile, temp_dir, extent):
+def mt_layover(
+        filelist,
+        outfile,
+        extent
+):
     '''
     This function is usally used in the time-series workflow of OST. A list
     of the filepaths layover/shadow masks
@@ -98,46 +113,50 @@ def mt_layover(filelist, outfile, temp_dir, extent):
 
     # get the start time for Info on processing time
     start = time.time()
-    # create path to out file
-    ls_layer = opj(temp_dir, os.path.basename(outfile))
 
-    # create a vrt-stack out of
-    logger.debug('INFO: Creating common Layover/Shadow Mask')
-    vrt_options = gdal.BuildVRTOptions(srcNodata=0, separate=True)
-    gdal.BuildVRT(opj(temp_dir, 'ls.vrt'), filelist, options=vrt_options)
+    with TemporaryDirectory() as temp:
+        # create path to out file
+        ls_layer = opj(temp, os.path.basename(outfile))
 
-    with rasterio.open(opj(temp_dir, 'ls.vrt')) as src:
+        # create a vrt-stack out of
+        logger.debug('INFO: Creating common Layover/Shadow Mask')
+        vrt_options = gdal.BuildVRTOptions(srcNodata=0, separate=True)
+        gdal.BuildVRT(opj(temp, 'ls.vrt'), filelist, options=vrt_options)
 
-        # get metadata
-        meta = src.meta
-        # update driver and reduced band count
-        meta.update(driver='GTiff', count=1, dtype='uint8')
+        with rasterio.open(opj(temp, 'ls.vrt')) as src:
 
-        # create outfiles
-        with rasterio.open(ls_layer, 'w', **meta) as out_min:
+            # get metadata
+            meta = src.meta
+            # update driver and reduced band count
+            meta.update(driver='GTiff', count=1, dtype='uint8')
 
-            # loop through blocks
-            for _, window in src.block_windows(1):
+            # create outfiles
+            with rasterio.open(ls_layer, 'w', **meta) as out_min:
 
-                # read array with all bands
-                stack = src.read(range(1, src.count + 1), window=window)
+                # loop through blocks
+                for _, window in src.block_windows(1):
 
-                # get stats
-                arr_max = np.nanmax(stack, axis=0)
-                arr = arr_max / arr_max
+                    # read array with all bands
+                    stack = src.read(range(1, src.count + 1), window=window)
 
-                out_min.write(np.uint8(arr), window=window, indexes=1)
+                    # get stats
+                    arr_max = np.nanmax(stack, axis=0)
+                    arr = arr_max / arr_max
 
-    ras.mask_by_shape(ls_layer, outfile, extent, to_db=False,
-                      datatype='uint8', rescale=False, ndv=0)
-    # os.remove(ls_layer)
-    h.timer(start)
+                    out_min.write(np.uint8(arr), window=window, indexes=1)
 
+        ras.mask_by_shape(ls_layer, outfile, extent, to_db=False,
+                          datatype='uint8', rescale=False, ndv=0)
+        # os.remove(ls_layer)
+        h.timer(start)
     return outfile
 
 
-def mt_extent(list_of_scenes, out_file, temp_dir, buffer=None):
-
+def mt_extent(
+        list_of_scenes,
+        out_file,
+        buffer=None
+):
     out_dir = os.path.dirname(out_file)
     vrt_options = gdal.BuildVRTOptions(srcNodata=0, separate=True)
 
@@ -148,28 +167,25 @@ def mt_extent(list_of_scenes, out_file, temp_dir, buffer=None):
 
     logger.debug('INFO: Creating shapefile of common extent.')
     start = time.time()
+    with TemporaryDirectory() as temp:
+        outline_file = opj(temp, os.path.basename(out_file))
+        ras.outline(opj(out_dir, 'extent.vrt'), outline_file, 0, False)
 
-    outline_file = opj(temp_dir, os.path.basename(out_file))
-    ras.outline(opj(out_dir, 'extent.vrt'), outline_file, 0, False)
+        vec.exterior(outline_file, out_file, buffer)
+        h.delete_shapefile(outline_file)
 
-    vec.exterior(outline_file, out_file, buffer)
-    h.delete_shapefile(outline_file)
-
-    os.remove(opj(out_dir, 'extent.vrt'))
-    h.timer(start)
-
+        os.remove(opj(out_dir, 'extent.vrt'))
+        h.timer(start)
     return out_file
 
 
 def remove_outliers(arrayin, stddev=3, z_threshold=None):
-
     if z_threshold:
         z_score = np.abs(stats.zscore(arrayin))
         array_out = np.ma.MaskedArray(
             arrayin,
             mask=z_score > z_threshold)
     else:
-
         # calculate percentiles
         perc95 = np.percentile(arrayin, 95, axis=0)
         perc5 = np.percentile(arrayin, 5, axis=0)
@@ -182,7 +198,6 @@ def remove_outliers(arrayin, stddev=3, z_threshold=None):
                 arrayin < perc5
                 )
             )
-
         # we calculate new std and mean
         masked_std = np.std(masked_array, axis=0)
         masked_mean = np.mean(masked_array, axis=0)
@@ -195,21 +210,24 @@ def remove_outliers(arrayin, stddev=3, z_threshold=None):
                 arrayin < masked_mean - masked_std * stddev,
                 )
             )
-
     return array_out
 
 
-def mt_metrics(stack, out_prefix, metrics, rescale_to_datatype=False,
-               to_power=False, outlier_removal=False):
+def mt_metrics(
+        stack,
+        out_prefix,
+        metrics,
+        rescale_to_datatype=False,
+        to_power=False,
+        outlier_removal=False
+):
 
     with rasterio.open(stack) as src:
         # get metadata
         meta = src.profile
-
         # update driver and reduced band count
         meta.update({'driver': 'GTiff'})
         meta.update({'count': 1})
-
         # write all different output files into a dictionary
         metric_dict = {}
         for metric in metrics:
@@ -218,22 +236,20 @@ def mt_metrics(stack, out_prefix, metrics, rescale_to_datatype=False,
 
         # scaling factors in case we have to rescale to integer
         minimums = {'avg': -30, 'max': -30, 'min': -30,
-                    'std': 0.00001, 'cov': 0.00001}
-        maximums = {'avg': 5, 'max': 5, 'min': 5, 'std': 15, 'cov': 1}
+                    'std': 0.00001, 'cov': 0.00001, 'count': 0
+                    }
+        maximums = {'avg': 5, 'max': 5, 'min': 5, 'std': 15, 'cov': 1, 'count': 9999}
 
         # loop through blocks
         for _, window in src.block_windows(1):
-
             # read array with all bands
             stack = src.read(range(1, src.count + 1), window=window)
-
             if rescale_to_datatype is True and meta['dtype'] != 'float32':
                 stack = ras.rescale_to_float(stack, meta['dtype'])
 
             # transform to power
             if to_power is True:
                 stack = ras.convert_to_power(stack)
-
             # outlier removal (only applies if there are more than 5 bands)
             if outlier_removal is True and src.count >= 5:
                 stack = remove_outliers(stack)
@@ -241,35 +257,42 @@ def mt_metrics(stack, out_prefix, metrics, rescale_to_datatype=False,
             # get stats
             arr = {}
             arr['avg'] = (np.nan_to_num(np.nanmean(stack, axis=0))
-                          if 'avg'in metrics else False)
+                          if 'avg' in metrics else False
+                          )
             arr['max'] = (np.nan_to_num(np.nanmax(stack, axis=0))
-                          if 'max'in metrics else False)
+                          if 'max' in metrics else False
+                          )
             arr['min'] = (np.nan_to_num(np.nanmin(stack, axis=0))
-                          if 'min'in metrics else False)
+                          if 'min' in metrics else False
+                          )
             arr['std'] = (np.nan_to_num(np.nanstd(stack, axis=0))
-                          if 'std'in metrics else False)
-            arr['cov'] = (np.nan_to_num(stats.variation(stack, axis=0,
-                                                        nan_policy='omit'))
-                          if 'cov'in metrics else False)
+                          if 'std' in metrics else False
+                          )
+            arr['cov'] = (np.nan_to_num(
+                stats.variation(stack, axis=0, nan_policy='omit')
+            )
+                          if 'cov' in metrics else False
+                          )
+            arr['count'] = (np.nan_to_num(
+                np.count_nonzero(stack, axis=0)
+            )
+                          if 'count' in metrics else False
+                          )
 
             # the metrics to be re-turned to dB, in case to_power is True
             metrics_to_convert = ['avg', 'min', 'max']
 
             # do the back conversions and write to disk loop
             for metric in metrics:
-
                 if to_power is True and metric in metrics_to_convert:
                     arr[metric] = ras.convert_to_db(arr[metric])
-
                 if rescale_to_datatype is True and meta['dtype'] != 'float32':
                     arr[metric] = ras.scale_to_int(arr[metric], meta['dtype'],
                                                    minimums[metric],
                                                    maximums[metric])
-
                 # write to dest
                 metric_dict[metric].write(
                     np.float32(arr[metric]), window=window, indexes=1)
-
     # close the output files
     for metric in metrics:
         metric_dict[metric].close()
@@ -287,74 +310,80 @@ def create_datelist(path_to_timeseries):
 
     with open('{}/datelist.txt'.format(path_to_timeseries), 'w') as file:
         for date in dates:
-            file.write(str(datetime.strftime(datetime.strptime(
-                date, '%y%m%d'), '%Y-%m-%d')) + '\n')
+            file.write(
+                str(
+                    datetime.strftime(datetime.strptime(date, '%y%m%d'), '%Y-%m-%d')
+                ) + '\n'
+            )
 
 
-def create_ts_animation(ts_dir, temp_dir, outfile, shrink_factor):
-
+def create_ts_animation(
+        ts_dir,
+        outfile,
+        shrink_factor
+):
     for file in sorted(glob.glob(opj(ts_dir, '*VV.tif'))):
         file_index = os.path.basename(file).split('.')[0]
         date = os.path.basename(file).split('.')[1]
         file_vv = file
         file_vh = glob.glob(opj(ts_dir, '{}.*VH.tif'.format(file_index)))[0]
+        with TemporaryDirectory() as temp:
+            out_temp = opj(temp, '{}.jpg'.format(date))
+            with rasterio.open(file_vv) as vv_pol:
+                # get metadata
+                out_meta = vv_pol.meta.copy()
+                # !!!assure that dimensions match ####
+                new_height = int(vv_pol.height/shrink_factor)
+                new_width = int(vv_pol.width/shrink_factor)
+                out_shape = (vv_pol.count, new_height, new_width)
 
-        out_temp = opj(temp_dir, '{}.jpg'.format(date))
+                out_meta.update(height=new_height, width=new_width)
 
-        with rasterio.open(file_vv) as vv_pol:
-            # get metadata
-            out_meta = vv_pol.meta.copy()
+                # create empty array
+                arr = np.zeros((int(out_meta['height']),
+                                int(out_meta['width']),
+                                int(3)))
+                # read vv array
+                arr[:, :, 0] = vv_pol.read(out_shape=out_shape, resampling=5)
 
-            # !!!assure that dimensions match ####
-            new_height = int(vv_pol.height/shrink_factor)
-            new_width = int(vv_pol.width/shrink_factor)
-            out_shape = (vv_pol.count, new_height, new_width)
+            with rasterio.open(file_vh) as vh_pol:
+                # read vh array
+                arr[:, :, 1] = vh_pol.read(out_shape=out_shape, resampling=5)
 
-            out_meta.update(height=new_height, width=new_width)
+            # create ratio
+            arr[:, :, 2] = np.subtract(arr[:, :, 0], arr[:, :, 1])
 
-            # create empty array
-            arr = np.zeros((int(out_meta['height']),
-                            int(out_meta['width']),
-                            int(3)))
-            # read vv array
-            arr[:, :, 0] = vv_pol.read(out_shape=out_shape, resampling=5)
+            # rescale_to_datatype to uint8
+            arr[:, :, 0] = ras.scale_to_int(arr[:, :, 0], -20., 0., 'uint8')
+            arr[:, :, 1] = ras.scale_to_int(arr[:, :, 1], -25., -5., 'uint8')
+            arr[:, :, 2] = ras.scale_to_int(arr[:, :, 2], 1., 15., 'uint8')
 
-        with rasterio.open(file_vh) as vh_pol:
-            # read vh array
-            arr[:, :, 1] = vh_pol.read(out_shape=out_shape, resampling=5)
+            # update outfile's metadata
+            out_meta.update({'driver': 'JPEG',
+                             'dtype': 'uint8',
+                             'count': 3})
 
-        # create ratio
-        arr[:, :, 2] = np.subtract(arr[:, :, 0], arr[:, :, 1])
+            # transpose array to gdal format
+            arr = np.transpose(arr, [2, 0, 1])
 
-        # rescale_to_datatype to uint8
-        arr[:, :, 0] = ras.scale_to_int(arr[:, :, 0], -20., 0., 'uint8')
-        arr[:, :, 1] = ras.scale_to_int(arr[:, :, 1], -25., -5., 'uint8')
-        arr[:, :, 2] = ras.scale_to_int(arr[:, :, 2], 1., 15., 'uint8')
+            # write array to disk
+            with rasterio.open(out_temp, 'w', **out_meta) as out:
+                out.write(arr.astype('uint8'))
 
-        # update outfile's metadata
-        out_meta.update({'driver': 'JPEG',
-                         'dtype': 'uint8',
-                         'count': 3})
+            # add date
+            label_height = np.floor(np.divide(int(out_meta['height']), 15))
+            cmd = 'convert -background \'#0008\' -fill white -gravity center \
+                  -size {}x{} caption:\"{}\" {} +swap -gravity north \
+                  -composite {}'.format(out_meta['width'],
+                                        label_height,
+                                        date, out_temp,
+                                        out_temp
+                                        )
+            os.system(cmd)
 
-        # transpose array to gdal format
-        arr = np.transpose(arr, [2, 0, 1])
-
-        # write array to disk
-        with rasterio.open(out_temp, 'w', **out_meta) as out:
-            out.write(arr.astype('uint8'))
-
-        # add date
-        label_height = np.floor(np.divide(int(out_meta['height']), 15))
-        cmd = 'convert -background \'#0008\' -fill white -gravity center \
-              -size {}x{} caption:\"{}\" {} +swap -gravity north \
-              -composite {}'.format(out_meta['width'], label_height,
-                                    date, out_temp, out_temp)
+        # create gif
+        lst_of_files = ' '.join(sorted(glob.glob(opj(temp, '*jpg'))))
+        cmd = 'convert -delay 200 -loop 20 {} {}'.format(lst_of_files, outfile)
         os.system(cmd)
-
-    # create gif
-    lst_of_files = ' '.join(sorted(glob.glob(opj(temp_dir, '*jpg'))))
-    cmd = 'convert -delay 200 -loop 20 {} {}'.format(lst_of_files, outfile)
-    os.system(cmd)
-
-    for file in glob.glob(opj(temp_dir, '*jpg')):
-        os.remove(file)
+        for file in glob.glob(opj(temp, '*jpg')):
+            os.remove(file)

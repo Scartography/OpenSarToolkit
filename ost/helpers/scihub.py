@@ -11,8 +11,8 @@ from http.cookiejar import CookieJar
 import urllib.request as urlreq
 from shapely.wkt import loads
 
-from ost.helpers import helpers as h
-from ost.helpers.helpers import TqdmUpTo
+from ost.helpers import utils as h
+from ost.helpers.utils import TqdmUpTo
 
 logger = logging.getLogger(__name__)
 

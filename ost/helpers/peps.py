@@ -8,7 +8,7 @@ import multiprocessing
 import requests
 import tqdm
 
-from ost.helpers import helpers as h
+from ost.helpers import utils as h
 from ost import Sentinel1Scene as S1Scene
 
 logger = logging.getLogger(__name__)
