@@ -46,13 +46,15 @@ def download_sentinel1(inventory_df,
                        pword=pword,
                        concurrent=concurrent
                        )
-    batch_download(inventory_df=inventory_df,
-                   download_dir=download_dir,
-                   mirror=mirror,
-                   uname=uname,
-                   pword=pword,
-                   concurrent=concurrent
-                   )
+
+    inventory_df = batch_download(
+        inventory_df=inventory_df,
+        download_dir=download_dir,
+        mirror=mirror,
+        uname=uname,
+        pword=pword,
+        concurrent=concurrent
+    )
     return download_dir, inventory_df
 
 
@@ -137,14 +139,15 @@ def batch_download(
 ):
     # download in parallel
     if int(mirror) == 1:    # scihub
-        scihub_batch_download(
+        inventory_df = scihub_batch_download(
             inventory_df, download_dir, uname, pword, concurrent
         )
     elif int(mirror) == 2:  # ASF
-        asf_batch_download(
+        inventory_df = asf_batch_download(
             inventory_df, download_dir, uname, pword, concurrent
         )
     elif int(mirror) == 3:  # PEPS
-        peps_batch_download(
+        inventory_df = peps_batch_download(
             inventory_df, download_dir, uname, pword, concurrent
         )
+    return inventory_df

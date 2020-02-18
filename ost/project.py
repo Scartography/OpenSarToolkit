@@ -389,8 +389,8 @@ class Sentinel1Batch(Sentinel1):
         # set resolution in degree
         self.center_lat = loads(self.aoi).centroid.y
         if float(self.center_lat) > 59 or float(self.center_lat) < -59:
-            logger.debug('INFO: Scene is outside SRTM coverage. Will use 30m ASTER'
-                         'DEM instead.'
+            logger.debug('INFO: Scene is outside SRTM coverage. '
+                         'Will use 30m ASTER DEM instead.'
                          )
             self.ard_parameters['dem'] = 'ASTER 1sec GDEM'
 
@@ -399,11 +399,13 @@ class Sentinel1Batch(Sentinel1):
                 subset = str(vec.shp_to_wkt(subset, buffer=0.1, envelope=True))
             elif subset.startswith('POLYGON (('):
                 subset = loads(subset).buffer(0.1).to_wkt()
-            elif subset.geom_type == 'MultiPolygon' or subset.geom_type == 'Polygon':
+            elif subset.geom_type == 'MultiPolygon' \
+                    or subset.geom_type == 'Polygon':
                 subset = subset.wkt
             else:
                 logger.debug('ERROR: No valid subset given.'
-                             'Should be either path to a shapefile or a WKT Polygon.'
+                             'Should be either path to a shapefile '
+                             'or a WKT Polygon.'
                              )
                 sys.exit()
 
