@@ -139,7 +139,9 @@ class Sentinel1Scene:
 
         from ost.s1 import s1_dl
         df = pd.DataFrame({'identifier': [self.scene_id]})
-        s1_dl.download_sentinel1(df, download_dir, mirror=mirror)
+        self.download_dir, self.inventory_df = s1_dl.download_sentinel1(
+            df, download_dir, mirror=mirror
+        )
 
     # location of file (including diases)
     def _download_path(self, download_dir, mkdir=False):

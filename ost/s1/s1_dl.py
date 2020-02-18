@@ -53,7 +53,7 @@ def download_sentinel1(inventory_df,
                    pword=pword,
                    concurrent=concurrent
                    )
-    return download_dir
+    return download_dir, inventory_df
 
 
 def restore_download_dir(input_directory, download_dir):

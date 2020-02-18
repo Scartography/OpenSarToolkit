@@ -364,14 +364,16 @@ def scihub_batch_download(
         opj(download_dir, 'SAR', '*', '20*', '*', '*',
             '*.zip.downloaded')
     )
-    check_flag = _check_downloaded_files(inventory_df,
-                                         download_dir,
-                                         downloaded_scenes
-                                         )
+    check_flag, inventory_df = _check_downloaded_files(
+        inventory_df,
+        download_dir,
+        downloaded_scenes
+    )
     if check_flag is False:
         logger.debug(
             'Some products are missing from the archive: %s', missing_scenes
         )
+    return inventory_df
 
 
 def _prepare_scenes_to_dl(inventory_df, download_dir, uname, pword):
@@ -416,4 +418,7 @@ def _check_downloaded_files(inventory_df, download_dir, downloaded_scenes):
         filepath = scene._download_path(download_dir)
         if os.path.exists('{}.downloaded'.format(filepath)):
             scenes.remove(scene.scene_id)
-    return check
+            inventory_df = inventory_df[
+                inventory_df.identifier != scene.scene_id
+                ]
+    return check, inventory_df
