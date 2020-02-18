@@ -129,9 +129,12 @@ def s1_download(argument_list, uname, pword):
     except urllib.error.HTTPError as e:
         if e.code == 404:
             logger.debug(
-                'Product %s missing from the archive, continuing',
+                'Product %s missing from the archive, continuing.',
                 filename.split('/')[-1]
             )
+            with open(str('{}.downloaded'.format(filename)), 'w') as file:
+                file.write('successfully downloaded \n')
+            return 'empty'
         else:
             raise e
     except urllib.error.URLError as e:
