@@ -139,9 +139,12 @@ class Sentinel1Scene:
 
         from ost.s1 import s1_dl
         df = pd.DataFrame({'identifier': [self.scene_id]})
-        self.download_dir, self.inventory_df = s1_dl.download_sentinel1(
+        self.download_dir, self.missing_scenes = s1_dl.download_sentinel1(
             df, download_dir, mirror=mirror
         )
+        for missing in self.missing_scenes:
+            if missing in inventory_df.identifier:
+                inventory_df = inventory_df[inventory_df.identifier != missing]
         return self
 
     # location of file (including diases)

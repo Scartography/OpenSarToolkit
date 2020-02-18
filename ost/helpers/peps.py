@@ -179,6 +179,7 @@ def peps_batch_download(
         pword,
         concurrent=10
 ):
+    missing_scenes = []
     to_dl_list = _prepare_scenes_to_dl(inventory_df=inventory_df,
                                        download_dir=download_dir,
                                        uname=uname,
@@ -197,6 +198,7 @@ def peps_batch_download(
     _check_downloaded_files(inventory_df,
                             download_dir
                             )
+    return missing_scenes
 
 
 def _prepare_scenes_to_dl(inventory_df, download_dir, uname, pword):

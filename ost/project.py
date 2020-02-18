@@ -327,7 +327,7 @@ class Sentinel1(Generic):
             logger.debug(
                 'INFO: One or more of your scenes need to be downloaded.'
             )
-            self.download_dir, self.inventory_df = s1_dl.download_sentinel1(
+            self.download_dir, self.missing_scenes = s1_dl.download_sentinel1(
                 download_df,
                 self.download_dir,
                 mirror=mirror,
@@ -335,6 +335,9 @@ class Sentinel1(Generic):
                 uname=uname,
                 pword=pword
             )
+        for missing in self.missing_scenes:
+            if missing in inventory_df.identifier:
+                inventory_df = inventory_df[inventory_df.identifier != missing]
         return self
 
     def plot_inventory(self, inventory_df=None, transperancy=0.05, show=False):
@@ -377,7 +380,9 @@ class Sentinel1Batch(Sentinel1):
     # processing related functions
     def to_ard(self, subset=None, overwrite=False):
         if overwrite:
-            logger.debug('INFO: Deleting processing folder to start from scratch')
+            logger.debug(
+                'INFO: Deleting processing folder to start from scratch'
+            )
             h.remove_folder_content(self.processing_dir)
 
         if not self.ard_parameters:

@@ -216,7 +216,7 @@ def asf_batch_download(
         logger.debug(
             'Some products are missing from the archive: %s', missing_scenes
         )
-    return inventory_df
+    return missing_scenes
 
 
 def _prepare_scenes_to_dl(inventory_df, download_dir):
@@ -244,9 +244,6 @@ def _check_downloaded_files(inventory_df, download_dir, downloaded_scenes):
         for scene in scenes:
             scene = S1Scene(scene)
             filepath = scene._download_path(download_dir)
-            if not os.path.exists('{}.downloaded'.format(filepath)):
+            if os.path.exists('{}.downloaded'.format(filepath)):
                 scenes.remove(scene.scene_id)
-                inventory_df = inventory_df[
-                    inventory_df.identifier != scene.scene_id
-                ]
-    return check, inventory_df
+    return check

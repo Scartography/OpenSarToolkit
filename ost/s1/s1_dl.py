@@ -47,7 +47,7 @@ def download_sentinel1(inventory_df,
                        concurrent=concurrent
                        )
 
-    inventory_df = batch_download(
+    missing_scenes = batch_download(
         inventory_df=inventory_df,
         download_dir=download_dir,
         mirror=mirror,
@@ -55,7 +55,7 @@ def download_sentinel1(inventory_df,
         pword=pword,
         concurrent=concurrent
     )
-    return download_dir, inventory_df
+    return download_dir, missing_scenes
 
 
 def restore_download_dir(input_directory, download_dir):
@@ -139,15 +139,15 @@ def batch_download(
 ):
     # download in parallel
     if int(mirror) == 1:    # scihub
-        inventory_df = scihub_batch_download(
+        missing_scenes = scihub_batch_download(
             inventory_df, download_dir, uname, pword, concurrent
         )
     elif int(mirror) == 2:  # ASF
-        inventory_df = asf_batch_download(
+        missing_scenes = asf_batch_download(
             inventory_df, download_dir, uname, pword, concurrent
         )
     elif int(mirror) == 3:  # PEPS
-        inventory_df = peps_batch_download(
+        missing_scenes = peps_batch_download(
             inventory_df, download_dir, uname, pword, concurrent
         )
-    return inventory_df
+    return missing_scenes

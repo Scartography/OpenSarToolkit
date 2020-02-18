@@ -367,13 +367,14 @@ def scihub_batch_download(
     check_flag, inventory_df = _check_downloaded_files(
         inventory_df,
         download_dir,
-        downloaded_scenes
+        downloaded_scenes,
+        missing_scenes
     )
     if check_flag is False:
         logger.debug(
             'Some products are missing from the archive: %s', missing_scenes
         )
-    return inventory_df
+    return missing_scenes
 
 
 def _prepare_scenes_to_dl(inventory_df, download_dir, uname, pword):
@@ -405,10 +406,14 @@ def _prepare_scenes_to_dl(inventory_df, download_dir, uname, pword):
     return download_list
 
 
-def _check_downloaded_files(inventory_df, download_dir, downloaded_scenes):
+def _check_downloaded_files(inventory_df,
+                            download_dir,
+                            downloaded_scenes,
+                            missing_scenes
+                            ):
     from ost import Sentinel1Scene as S1Scene
     scenes = inventory_df['identifier'].tolist()
-    if len(inventory_df['identifier'].tolist()) == len(downloaded_scenes):
+    if len(inventory_df['identifier'].tolist()) == len(downloaded_scenes) and not missing_scenes:
         logger.debug('INFO: All products are downloaded.')
         check = True
     else:
@@ -416,9 +421,6 @@ def _check_downloaded_files(inventory_df, download_dir, downloaded_scenes):
     for scene in scenes:
         scene = S1Scene(scene)
         filepath = scene._download_path(download_dir)
-        if not os.path.exists('{}.downloaded'.format(filepath)):
+        if os.path.exists('{}.downloaded'.format(filepath)):
             scenes.remove(scene.scene_id)
-            inventory_df = inventory_df[
-                inventory_df.identifier != scene.scene_id
-                ]
-    return check, inventory_df
+    return check
