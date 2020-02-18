@@ -3,11 +3,12 @@ from os.path import join as opj
 import glob
 import logging
 import requests
-import multiprocessing
 from http.cookiejar import CookieJar
 import urllib.error
 import urllib.request as urlreq
+from retry import retry
 
+from godale import Executor
 
 from ost.helpers import utils as h
 from ost.helpers.utils import TqdmUpTo
@@ -21,7 +22,6 @@ class SessionWithHeaderRedirection(requests.Session):
     ''' A class that helps connect to NASA's Earthdata
 
     '''
-
     AUTH_HOST = 'urs.earthdata.nasa.gov'
 
     def __init__(self, username, password):
@@ -92,7 +92,8 @@ def check_connection(uname, pword):
     return response_code
 
 
-def s1_download(argument_list):
+@retry(tries=5, delay=1, logger=logger)
+def s1_download(argument_list, uname, pword):
     """
     This function will download S1 products from ASF mirror.
 
@@ -106,8 +107,6 @@ def s1_download(argument_list):
 
     url = argument_list[0]
     filename = argument_list[1]
-    uname = argument_list[2]
-    pword = argument_list[3]
 
     password_manager = urlreq.HTTPPasswordMgrWithDefaultRealm()
     password_manager.add_password(
@@ -176,42 +175,67 @@ def s1_download(argument_list):
                 file.write('successfully downloaded \n')
 
 
-def batch_download(inventory_df, download_dir, uname, pword, concurrent=10):
+def asf_batch_download(
+        inventory_df,
+        download_dir,
+        uname,
+        pword,
+        concurrent=10
+):
     # create list of scenes
-    scenes = inventory_df['identifier'].tolist()
-    check, i = False, 1
-    while check is False and i <= 10:
-        asf_list = []
-        for scene_id in scenes:
-            scene = S1Scene(scene_id)
-            filepath = scene._download_path(download_dir, True)
+    to_dl_list = _prepare_scenes_to_dl(inventory_df, download_dir)
+    executor_type = 'concurrent_threads'
+    executor = Executor(executor=executor_type, max_workers=concurrent)
+    for task in executor.as_completed(
+            func=s1_download,
+            iterable=to_dl_list,
+            fargs=(uname,
+                   pword,
+                   )
 
-            if os.path.exists('{}.downloaded'.format(filepath)):
-                logger.debug('INFO: {} is already downloaded.'
-                             .format(scene.scene_id))
-            else:
-                asf_list.append([scene.asf_url(), filepath,
-                                 uname, pword])
-        if asf_list:
-            pool = multiprocessing.Pool(processes=concurrent)
-            pool.map(s1_download, asf_list)
-                    
-        downloaded_scenes = glob.glob(
-            opj(download_dir, 'SAR', '*', '20*', '*', '*',
-                '*.zip.downloaded')
+    ):
+        task.result()
+
+    downloaded_scenes = glob.glob(
+        opj(download_dir, 'SAR', '*', '20*', '*', '*',
+            '*.zip.downloaded')
+    )
+    check_flag = _check_downloaded_files(
+        inventory_df, download_dir, downloaded_scenes
+    )
+    if check_flag is False:
+        raise RuntimeError(
+            'Something went wrong at the batch download of S1 products'
         )
 
-        if len(inventory_df['identifier'].tolist()) == len(downloaded_scenes):
-            check = True
-            logger.debug('INFO: All products are downloaded.')
+
+def _prepare_scenes_to_dl(inventory_df, download_dir):
+    scenes = inventory_df['identifier'].tolist()
+    download_list = []
+    for scene_id in scenes:
+        scene = S1Scene(scene_id)
+        filepath = scene._download_path(download_dir, True)
+
+        if os.path.exists('{}.downloaded'.format(filepath)):
+            logger.debug('INFO: {} is already downloaded.'
+                         .format(scene.scene_id))
         else:
-            check = False
-            for scene in scenes:
+            download_list.append([scene.asf_url(), filepath])
+    return download_list
 
-                scene = S1Scene(scene)
-                filepath = scene._download_path(download_dir)
 
-                if os.path.exists('{}.downloaded'.format(filepath)):
-                    scenes.remove(scene.scene_id)
+def _check_downloaded_files(inventory_df, download_dir, downloaded_scenes):
+    scenes = inventory_df['identifier'].tolist()
+    if len(inventory_df['identifier'].tolist()) == len(downloaded_scenes):
+        check = True
+        logger.debug('INFO: All products are downloaded.')
+    else:
+        check = False
+        for scene in scenes:
 
-        i += 1
+            scene = S1Scene(scene)
+            filepath = scene._download_path(download_dir)
+
+            if os.path.exists('{}.downloaded'.format(filepath)):
+                scenes.remove(scene.scene_id)
+    return check
