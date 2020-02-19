@@ -542,6 +542,7 @@ class Sentinel1Batch(Sentinel1):
                 self.aoi, self.burst_inventory,
                 '{}.refined.shp'.format(outfile[:-4])
             )
+        return self
 
     def create_timeseries_animations(self,
                                      shrink_factor=5,

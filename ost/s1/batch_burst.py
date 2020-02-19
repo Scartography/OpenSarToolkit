@@ -47,8 +47,7 @@ def burst_to_ard_batch(
     for task in executor.as_completed(
             func=_execute_batch_burst_ard,
             iterable=burst_inventory.iterrows(),
-            fargs=(burst_inventory,
-                   processing_dir,
+            fargs=(processing_dir,
                    download_dir,
                    data_mount,
                    ard_parameters,
@@ -61,84 +60,70 @@ def burst_to_ard_batch(
 @retry(tries=3, delay=1, logger=logger)
 def _execute_batch_burst_ard(
         burst,
-        burst_inventory,
         processing_dir,
         download_dir,
         data_mount,
         ard_parameters
 ):
     index, burst = burst
-    m_nr, m_burst_id, b_bbox = burst['BurstNr'], burst['bid'], burst['geometry']
+    m_nr, m_burst_id, b_bbox, date = burst['BurstNr'], burst['bid'], \
+                                     burst['geometry'], burst['Date']
     resolution = ard_parameters['resolution']
     product_type = ard_parameters['product_type']
     speckle_filter = ard_parameters['speckle_filter']
     ls_mask_create = ard_parameters['ls_mask_create']
     to_db = ard_parameters['to_db']
     dem = ard_parameters['dem']
-    # create a list of dates over which we loop
-    dates = burst_inventory.Date[
-        burst_inventory.bid == m_burst_id].sort_values().tolist()
 
-    # loop through dates
-    for idx, date in enumerate(dates):
-        m_nr, m_burst_id, b_bbox = burst['BurstNr'], burst['bid'], burst['geometry']
-        logger.debug(
-            'INFO: Entering burst {} at date {}.'.format(m_burst_id, date)
-        )
-        # get master date
-        master_date = dates[idx]
-        # read master burst
-        master_burst = burst_inventory[
-            (burst_inventory.Date == master_date) &
-            (burst_inventory.bid == m_burst_id)
-        ]
+    logger.debug(
+        'INFO: Entering burst {} at date {}.'.format(m_burst_id, date)
+    )
+    master_scene = S1Scene(burst.SceneID.values[0])
 
-        master_scene = S1Scene(master_burst.SceneID.values[0])
+    # get path to file
+    master_file = master_scene.get_path(download_dir, data_mount)
+    # get subswath
+    subswath = burst.SwathID.values[0]
+    # get burst number in file
+    master_burst_nr = burst.BurstNr.values[0]
+    # create a fileId
+    master_id = '{}_{}'.format(date, burst.bid.values[0])
+    # create out folder
+    out_dir = '{}/{}/{}'.format(processing_dir, m_burst_id, date)
+    os.makedirs(out_dir, exist_ok=True)
 
-        # get path to file
-        master_file = master_scene.get_path(download_dir, data_mount)
-        # get subswath
-        subswath = master_burst.SwathID.values[0]
-        # get burst number in file
-        master_burst_nr = master_burst.BurstNr.values[0]
-        # create a fileId
-        master_id = '{}_{}'.format(master_date, master_burst.bid.values[0])
-        # create out folder
-        out_dir = '{}/{}/{}'.format(processing_dir, m_burst_id, date)
-        os.makedirs(out_dir, exist_ok=True)
-
-        # check if already processed
-        if os.path.isfile(opj(out_dir, '.processed')):
-            logger.debug('INFO: Burst {} from {} already processed'.format(
-                m_burst_id, date))
-            return_code = 0
-            return return_code
-        with TemporaryDirectory() as temp_dir:
-            try:
-                return_code = burst_to_ard.burst_to_ard(
-                    master_file=master_file,
-                    swath=subswath,
-                    master_burst_nr=master_burst_nr,
-                    master_burst_id=master_id,
-                    master_burst_poly=b_bbox,
-                    out_dir=out_dir,
-                    out_prefix=master_id,
-                    temp_dir=temp_dir,
-                    resolution=resolution,
-                    product_type=product_type,
-                    speckle_filter=speckle_filter,
-                    to_db=to_db,
-                    ls_mask_create=ls_mask_create,
-                    dem=dem,
-                )
-            except Exception as e:
-                raise e
-            if return_code != 0:
-                raise RuntimeError(
-                    'Something went wrong with the GPT processing! '
-                    'with return code: %s' % return_code
-                )
+    # check if already processed
+    if os.path.isfile(opj(out_dir, '.processed')):
+        logger.debug('INFO: Burst {} from {} already processed'.format(
+            m_burst_id, date))
+        return_code = 0
         return return_code
+    with TemporaryDirectory() as temp_dir:
+        try:
+            return_code = burst_to_ard.burst_to_ard(
+                master_file=master_file,
+                swath=subswath,
+                master_burst_nr=master_burst_nr,
+                master_burst_id=master_id,
+                master_burst_poly=b_bbox,
+                out_dir=out_dir,
+                out_prefix=master_id,
+                temp_dir=temp_dir,
+                resolution=resolution,
+                product_type=product_type,
+                speckle_filter=speckle_filter,
+                to_db=to_db,
+                ls_mask_create=ls_mask_create,
+                dem=dem,
+            )
+        except Exception as e:
+            raise e
+        if return_code != 0:
+            raise RuntimeError(
+                'Something went wrong with the GPT processing! '
+                'with return code: %s' % return_code
+            )
+    return return_code
 
 
 def _ard_to_ts(
