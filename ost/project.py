@@ -273,8 +273,11 @@ class Sentinel1(Generic):
             download_size = self.inventory[
                 'size'].str.replace('GB', '').astype('float32').sum()
 
-        logger.debug('INFO: There are about {} GB need to be downloaded.'.format(
-                download_size))
+        logger.debug(
+            'INFO: There are about {} GB need to be downloaded.'.format(
+                download_size
+            )
+        )
 
     def refine(self,
                exclude_marginal=True,

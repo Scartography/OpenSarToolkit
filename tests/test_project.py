@@ -52,7 +52,9 @@ def test_sentinel1_slc_batch(some_bounds):
             TemporaryDirectory(dir=os.getcwd()) as inv_temp:
         sen1 = SenBatch(
             project_dir=temp,
-            aoi=box(some_bounds[0], some_bounds[1], some_bounds[2], some_bounds[3]).wkt,
+            aoi=box(
+                some_bounds[0], some_bounds[1], some_bounds[2], some_bounds[3]
+            ).wkt,
             start='2020-01-01',
             end='2020-01-04',
             data_mount='/eodata',
@@ -83,9 +85,6 @@ def test_sentinel1_slc_batch(some_bounds):
             ).wkt,
             overwrite=True
         )
-        sen1.create_timeseries()
-        sen1.create_timescan()
-        sen1.create_timeseries_animations()
 
 
 def test_sentinel1_grd_batch(some_bounds):
@@ -94,7 +93,9 @@ def test_sentinel1_grd_batch(some_bounds):
             TemporaryDirectory(dir=os.getcwd()) as inv_temp:
         sen1 = SenBatch(
             project_dir=temp,
-            aoi=box(some_bounds[0], some_bounds[1], some_bounds[2], some_bounds[3]).wkt,
+            aoi=box(
+                some_bounds[0], some_bounds[1], some_bounds[2], some_bounds[3]
+            ).wkt,
             start='2020-01-01',
             end='2020-01-04',
             data_mount='/eodata',
