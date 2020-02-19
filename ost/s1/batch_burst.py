@@ -42,7 +42,7 @@ def burst_to_ard_batch(
                         )
     for task in executor.as_completed(
             func=_execute_batch_burst_ard,
-            iterable=burst_inventory,
+            iterable=burst_inventory.iterrows(),
             fargs=(burst_inventory,
                    processing_dir,
                    download_dir,
@@ -62,9 +62,9 @@ def _execute_batch_burst_ard(
         data_mount,
         ard_parameters
 ):
-    m_nr, m_burst_id, b_bbox = burst
+    index, burst = burst
+    m_nr, m_burst_id, b_bbox = burst['BurstNr'], burst['bid'], burst['geometry']
     resolution = ard_parameters['resolution']
-    # border_noise = ard_parameters['border_noise']
     product_type = ard_parameters['product_type']
     speckle_filter = ard_parameters['speckle_filter']
     ls_mask_create = ard_parameters['ls_mask_create']
@@ -76,6 +76,10 @@ def _execute_batch_burst_ard(
 
     # loop through dates
     for idx, date in enumerate(dates):
+        burst = burst_inventory.loc[burst_inventory['bid'] == burst
+                                    & (burst_inventory['Date'] == date)
+                                    ]
+        m_nr, m_burst_id, b_bbox = burst['BurstNr'], burst['bid'], burst['geometry']
         logger.debug(
             'INFO: Entering burst {} at date {}.'.format(m_burst_id, date)
         )
@@ -84,7 +88,8 @@ def _execute_batch_burst_ard(
         # read master burst
         master_burst = burst_inventory[
             (burst_inventory.Date == master_date) &
-            (burst_inventory.bid == m_burst_id)]
+            (burst_inventory.bid == m_burst_id)
+        ]
 
         master_scene = S1Scene(master_burst.SceneID.values[0])
 
@@ -104,7 +109,8 @@ def _execute_batch_burst_ard(
         if os.path.isfile(opj(out_dir, '.processed')):
             logger.debug('INFO: Burst {} from {} already processed'.format(
                 m_burst_id, date))
-            return
+            return_code = 0
+            return return_code
         with TemporaryDirectory() as temp_dir:
             # run routine
             return_code = burst_to_ard.burst_to_ard(
