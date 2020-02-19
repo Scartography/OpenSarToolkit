@@ -1,7 +1,7 @@
 import logging
 
-from ost.s1.s1scene import Sentinel1Scene
-from ost.s1.s1scenes import Sentinel1Scenes
+from ost.s1_core.s1scene import Sentinel1Scene
+from ost.s1_core.s1scenes import Sentinel1Scenes
 from ost.project import Generic, Sentinel1
 from ost.project import Sentinel1Batch
 

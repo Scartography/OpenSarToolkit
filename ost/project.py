@@ -9,9 +9,9 @@ from datetime import datetime
 from shapely.wkt import loads
 
 from ost.helpers.bursts import burst_inventory, refine_burst_inventory
-from ost.s1 import search, refine, s1_dl, batch
-from ost.s1.batch import _to_ard_batch
-from ost.s1.batch_burst import burst_to_ard_batch
+from ost.s1_core import search, refine, s1_dl, batch
+from ost.s1_core.batch import _to_ard_batch
+from ost.s1_core.batch_burst import burst_to_ard_batch
 from ost.helpers import scihub, utils as h, vector as vec
 from ost.multitemporal.utils import create_timeseries_animation
 from ost.settings import SNAP_S1_RESAMPLING_METHODS, ARD_TIMESCAN_METRICS

@@ -24,8 +24,8 @@ from godale import Executor
 from ost.settings import SNAP_S1_RESAMPLING_METHODS
 from ost.helpers import scihub, raster as ras
 from ost.helpers.utils import execute_ard
-from ost.to_ard.grd_to_ard import grd_to_ard
-from ost.s1.convert_format import ard_to_rgb, ard_to_thumbnail, \
+from ost.s1_to_ard.grd_to_ard import grd_to_ard
+from ost.s1_core.convert_format import ard_to_rgb, ard_to_thumbnail, \
     ard_slc_to_rgb, ard_slc_to_thumbnail
 from ost.helpers.bursts import get_bursts_by_polygon
 
@@ -137,7 +137,7 @@ class Sentinel1Scene:
         #    logger.debug('(3) PEPS (CNES, 1 year rolling archive)')
         #    mirror = input(' Type 1, 2 or 3: ')
 
-        from ost.s1 import s1_dl
+        from ost.s1_core import s1_dl
         df = pd.DataFrame({'identifier': [self.scene_id]})
         self.download_dir, self.missing_scenes = s1_dl.download_sentinel1(
             df, download_dir, mirror=mirror

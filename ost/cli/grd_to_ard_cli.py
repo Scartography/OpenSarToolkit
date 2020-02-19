@@ -1,7 +1,7 @@
 import os
 import argparse
 
-from ost.to_ard.grd_to_ard import grd_to_ard
+from ost.s1_to_ard.grd_to_ard import grd_to_ard
 
 if __name__ == "__main__":
     # write a description

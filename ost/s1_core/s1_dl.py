@@ -9,7 +9,7 @@ import glob
 import logging
 import getpass
 
-from ost.s1.s1scene import Sentinel1Scene as S1Scene
+from ost.s1_core.s1scene import Sentinel1Scene as S1Scene
 from ost.helpers.asf import asf_batch_download
 from ost.helpers.scihub import scihub_batch_download
 from ost.helpers.peps import peps_batch_download

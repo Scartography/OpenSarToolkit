@@ -7,7 +7,7 @@ from ost.helpers.utils import check_zipfile
 from ost.helpers.asf import check_connection as check_connection_asf
 from ost.helpers.scihub import check_connection as check_connection_scihub, \
     connect
-from ost.s1.s1_dl import download_sentinel1
+from ost.s1_core.s1_dl import download_sentinel1
 
 from ost.settings import HERBERT_USER
 

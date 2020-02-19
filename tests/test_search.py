@@ -2,7 +2,7 @@ import os
 import geopandas as gpd
 from tempfile import TemporaryDirectory
 
-from ost.s1.search import scihub_catalogue
+from ost.s1_core.search import scihub_catalogue
 from ost.helpers.scihub import create_query, create_aoi_str, create_toi_str, \
     create_s1_product_specs
 from ost.settings import HERBERT_USER

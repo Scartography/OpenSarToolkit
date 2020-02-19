@@ -14,8 +14,8 @@ from godale import Executor
 import gdal
 
 from ost.helpers import vector as vec, raster as ras, utils as h
-from ost.s1 import timeseries
-from ost.to_ard import burst_to_ard
+from ost.s1_core import timeseries
+from ost.s1_to_ard import burst_to_ard
 from ost import Sentinel1Scene as S1Scene
 
 logger = logging.getLogger(__name__)

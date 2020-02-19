@@ -4,8 +4,8 @@ from tempfile import TemporaryDirectory
 
 from shapely.geometry import box
 
-from ost.s1.s1scenes import Sentinel1Scenes as S1Scenes
-from ost.s1.s1scene import Sentinel1Scene as S1Scene
+from ost.s1_core.s1scenes import Sentinel1Scenes as S1Scenes
+from ost.s1_core.s1scene import Sentinel1Scene as S1Scene
 
 
 def test_s1_scenes(s1_slc_master,

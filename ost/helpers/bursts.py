@@ -98,7 +98,7 @@ def burst_inventory(inventory_df,
 
     '''
     # create column names for empty data frame
-    from ost.s1.s1scene import Sentinel1Scene as S1Scene
+    from ost.s1_core.s1scene import Sentinel1Scene as S1Scene
     column_names = ['SceneID', 'Track', 'Direction', 'Date', 'SwathID',
                     'AnxTime', 'BurstNr', 'geometry']
 
