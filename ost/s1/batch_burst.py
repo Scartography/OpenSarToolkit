@@ -66,8 +66,6 @@ def _execute_batch_burst_ard(
         ard_parameters
 ):
     index, burst = burst
-    m_nr, m_burst_id, b_bbox, date = burst['BurstNr'], burst['bid'], \
-                                     burst['geometry'], burst['Date']
     resolution = ard_parameters['resolution']
     product_type = ard_parameters['product_type']
     speckle_filter = ard_parameters['speckle_filter']
@@ -76,26 +74,28 @@ def _execute_batch_burst_ard(
     dem = ard_parameters['dem']
 
     logger.debug(
-        'INFO: Entering burst {} at date {}.'.format(m_burst_id, date)
+        'INFO: Entering burst {} at date {}.'.format(
+            burst.BurstNr,  burst.Date
+        )
     )
-    master_scene = S1Scene(burst.SceneID.values[0])
+    master_scene = S1Scene(burst.SceneID)
 
     # get path to file
     master_file = master_scene.get_path(download_dir, data_mount)
     # get subswath
-    subswath = burst.SwathID.values[0]
+    subswath = burst.SwathID
     # get burst number in file
-    master_burst_nr = burst.BurstNr.values[0]
+    master_burst_nr = burst.BurstNr
     # create a fileId
-    master_id = '{}_{}'.format(date, burst.bid.values[0])
+    master_id = '{}_{}'.format(burst.Date, burst.bid)
     # create out folder
-    out_dir = '{}/{}/{}'.format(processing_dir, m_burst_id, date)
+    out_dir = '{}/{}/{}'.format(processing_dir, burst.bid, burst.Date)
     os.makedirs(out_dir, exist_ok=True)
 
     # check if already processed
     if os.path.isfile(opj(out_dir, '.processed')):
         logger.debug('INFO: Burst {} from {} already processed'.format(
-            m_burst_id, date))
+            burst.bid, burst.Date))
         return_code = 0
         return return_code
     with TemporaryDirectory() as temp_dir:
@@ -103,9 +103,9 @@ def _execute_batch_burst_ard(
             return_code = burst_to_ard.burst_to_ard(
                 master_file=master_file,
                 swath=subswath,
-                master_burst_nr=master_burst_nr,
+                master_burst_nr=burst['BurstNr'],
                 master_burst_id=master_id,
-                master_burst_poly=b_bbox,
+                master_burst_poly=burst['geometry'],
                 out_dir=out_dir,
                 out_prefix=master_id,
                 temp_dir=temp_dir,
