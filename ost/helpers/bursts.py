@@ -5,7 +5,6 @@ import geopandas as gpd
 from shapely.geometry import box
 
 from ost.helpers import scihub, vector as vec
-from ost.s1.s1scene import Sentinel1Scene as S1Scene
 
 logger = logging.getLogger(__name__)
 
@@ -84,8 +83,12 @@ def get_bursts_pairs(master_annotation, slave_annotation, out_poly=None):
     return bursts_dict
 
 
-def burst_inventory(inventory_df, outfile, download_dir=os.getenv('HOME'),
-                    data_mount='/eodata', uname=None, pword=None):
+def burst_inventory(inventory_df,
+                    outfile,
+                    download_dir=os.getenv('HOME'),
+                    data_mount='/eodata',
+                    uname=None, pword=None
+                    ):
     '''Creates a Burst GeoDataFrame from an OST inventory file
 
     Args:
@@ -95,6 +98,7 @@ def burst_inventory(inventory_df, outfile, download_dir=os.getenv('HOME'),
 
     '''
     # create column names for empty data frame
+    from ost.s1.s1scene import Sentinel1Scene as S1Scene
     column_names = ['SceneID', 'Track', 'Direction', 'Date', 'SwathID',
                     'AnxTime', 'BurstNr', 'geometry']
 
