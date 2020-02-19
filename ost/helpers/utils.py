@@ -10,7 +10,7 @@ import time
 import gdal
 import datetime
 import logging
-from tqdm import tqdm_notebook
+from tqdm.auto import tqdm
 from datetime import timedelta
 from pathlib import Path
 import zipfile
@@ -408,7 +408,7 @@ def execute_ard(
     return return_code, out_file
 
 
-class TqdmUpTo(tqdm_notebook):
+class TqdmUpTo(tqdm):
     """Provides `update_to(n)` which uses `tqdm.update(delta_n)`."""
     def update_to(self, b=1, bsize=1, tsize=None):
         """
