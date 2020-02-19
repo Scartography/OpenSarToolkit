@@ -447,7 +447,7 @@ class Sentinel1Batch(Sentinel1):
                 max_workers=self.max_workers
             )
         logger.debug(
-                'INFO:%s ARD processing for %s DONE in %s!',
+                'INFO:%s ARD processing for %s DONE!',
                 self.ard_parameters['type'], self.product_type
             )
 
