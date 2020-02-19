@@ -15,7 +15,7 @@ from datetime import timedelta
 from pathlib import Path
 import zipfile
 
-from ost.s1.burst_to_ard import burst_to_ard
+from ost.to_ard.burst_to_ard import burst_to_ard
 
 
 logger = logging.getLogger(__name__)

@@ -24,7 +24,7 @@ from godale import Executor
 from ost.settings import SNAP_S1_RESAMPLING_METHODS
 from ost.helpers import scihub, raster as ras
 from ost.helpers.utils import execute_ard
-from ost.s1.grd_to_ard import grd_to_ard
+from ost.to_ard.grd_to_ard import grd_to_ard
 from ost.s1.convert_format import ard_to_rgb, ard_to_thumbnail, \
     ard_slc_to_rgb, ard_slc_to_thumbnail
 from ost.helpers.bursts import get_bursts_by_polygon

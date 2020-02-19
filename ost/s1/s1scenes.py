@@ -9,8 +9,8 @@ from shapely.wkt import loads as shp_loads
 from ost.s1.s1scene import Sentinel1Scene as S1scene
 from ost.helpers.utils import _product_zip_to_processing_dir
 from ost.helpers.bursts import get_bursts_pairs
-from ost.s1.burst_to_ard import _2products_coherence_tc
-from ost.s1.timeseries import create_grd_stack, mt_speckle_filter
+from ost.to_ard.burst_to_ard import _2products_coherence_tc
+from ost.s1.timeseries import create_grd_stack
 
 logger = logging.getLogger(__name__)
 
