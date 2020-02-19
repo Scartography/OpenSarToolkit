@@ -8,7 +8,7 @@ from os.path import join as opj
 from datetime import datetime
 from shapely.wkt import loads
 
-from ost.s1 import batch_burst
+from ost.helpers.bursts import burst_inventory, refine_burst_inventory
 from ost.s1 import search, refine, s1_dl, batch
 from ost.s1.batch import _to_ard_batch
 from ost.s1.batch_burst import burst_to_ard_batch
@@ -46,15 +46,18 @@ class Generic():
             # get lowres data
             world = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
             country = world.name[world.iso_a3 == aoi].values[0]
-            logger.debug('INFO: Getting the country boundaries from Geopandas low'
-                         'resolution data for {}'.format(country)
-                         )
+            logger.debug(
+                'INFO: Getting the country boundaries from Geopandas low'
+                'resolution data for {}'.format(country)
+            )
 
             self.aoi = (world['geometry']
                         [world['iso_a3'] == aoi].values[0].to_wkt())
         elif aoi.split('.')[-1] == 'shp':
             self.aoi = str(vec.shp_to_wkt(aoi))
-            logger.debug('INFO: Using {} shapefile as Area of Interest definition.')
+            logger.debug(
+                'INFO: Using {} shapefile as Area of Interest definition.'
+            )
         else:
             try:
                 loads(str(aoi))
@@ -503,7 +506,7 @@ class Sentinel1Batch(Sentinel1):
         if key:
             outfile = opj(self.inventory_dir,
                           'bursts.{}.shp').format(key)
-            self.burst_inventory = batch_burst.burst_inventory(
+            self.burst_inventory = burst_inventory(
                 self.refined_inventory_dict[key],
                 outfile,
                 download_dir=self.download_dir,
@@ -514,7 +517,7 @@ class Sentinel1Batch(Sentinel1):
                           'bursts.full.shp'
                           )
 
-            self.burst_inventory = batch_burst.burst_inventory(
+            self.burst_inventory = burst_inventory(
                 self.inventory,
                 outfile,
                 download_dir=self.download_dir,
@@ -524,7 +527,7 @@ class Sentinel1Batch(Sentinel1):
 
         if refine:
             # logger.debug('{}.refined.shp'.format(outfile[:-4]))
-            self.burst_inventory = batch_burst.refine_burst_inventory(
+            self.burst_inventory = refine_burst_inventory(
                 self.aoi, self.burst_inventory,
                 '{}.refined.shp'.format(outfile[:-4])
             )
