@@ -400,8 +400,8 @@ def execute_ard(
     )
     if return_code != 0:
         raise RuntimeError(
-            'Something went wrong with the GPT processing! with return code: %s' %
-            return_code
+            'Something went wrong with the GPT processing! '
+            'with return code: %s' % return_code
         )
     if not os.path.isfile(out_file):
         raise RuntimeError

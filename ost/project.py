@@ -8,9 +8,10 @@ from os.path import join as opj
 from datetime import datetime
 from shapely.wkt import loads
 
-from ost.s1 import burst
+from ost.s1 import batch_burst
 from ost.s1 import search, refine, s1_dl, batch
 from ost.s1.batch import _to_ard_batch
+from ost.s1.batch_burst import burst_to_ard_batch
 from ost.helpers import scihub, utils as h, vector as vec
 from ost.multitemporal.utils import create_timeseries_animation
 from ost.settings import SNAP_S1_RESAMPLING_METHODS, ARD_TIMESCAN_METRICS
@@ -366,13 +367,15 @@ class Sentinel1Batch(Sentinel1):
                  beam_mode='IW',
                  polarisation='*',
                  track='*',
-                 ard_type='OST'
+                 ard_type='OST',
+                 max_workers=os.cpu_count()
                  ):
 
         super().__init__(project_dir, aoi, start, end, data_mount, mirror,
                          metadata_concurency, download_dir, inventory_dir,
                          processing_dir, product_type, beam_mode, polarisation
                          )
+        self.max_workers = max_workers
 
         self.ard_type = ard_type
         self.ard_parameters = {}
@@ -416,15 +419,7 @@ class Sentinel1Batch(Sentinel1):
                              'or a WKT Polygon.'
                              )
                 sys.exit()
-
-        nr_of_processed = len(
-            glob.glob(opj(self.processing_dir, '*', '20*', '.processed')))
-
-        # check and retry function
-        i = 0
-        while len(
-                self.inventory.groupby(['relativeorbit', 'acquisitiondate'])
-        ) > nr_of_processed:
+        if self.product_type == 'GRD':
             _to_ard_batch(
                 self.inventory,
                 self.download_dir,
@@ -432,13 +427,15 @@ class Sentinel1Batch(Sentinel1):
                 self.ard_parameters,
                 subset
             )
-            nr_of_processed = len(
-                glob.glob(opj(self.processing_dir, '*', '20*', '.processed'))
+        elif self.product_type == 'SLC' and not self.burst_inventory.empty:
+            burst_to_ard_batch(
+                burst_inventory=self.burst_inventory,
+                download_dir=self.download_dir,
+                processing_dir=self.processing_dir,
+                ard_parameters=self.ard_parameters,
+                data_mount=self.data_mount,
+                max_workers=self.max_workers
             )
-            i += 1
-            # not more than 5 trys
-            if i == 5:
-                break
 
     def create_timeseries(self):
         nr_of_processed = len(
@@ -506,7 +503,7 @@ class Sentinel1Batch(Sentinel1):
         if key:
             outfile = opj(self.inventory_dir,
                           'bursts.{}.shp').format(key)
-            self.burst_inventory = burst.burst_inventory(
+            self.burst_inventory = batch_burst.burst_inventory(
                 self.refined_inventory_dict[key],
                 outfile,
                 download_dir=self.download_dir,
@@ -517,7 +514,7 @@ class Sentinel1Batch(Sentinel1):
                           'bursts.full.shp'
                           )
 
-            self.burst_inventory = burst.burst_inventory(
+            self.burst_inventory = batch_burst.burst_inventory(
                 self.inventory,
                 outfile,
                 download_dir=self.download_dir,
@@ -527,7 +524,7 @@ class Sentinel1Batch(Sentinel1):
 
         if refine:
             # logger.debug('{}.refined.shp'.format(outfile[:-4]))
-            self.burst_inventory = burst.refine_burst_inventory(
+            self.burst_inventory = batch_burst.refine_burst_inventory(
                 self.aoi, self.burst_inventory,
                 '{}.refined.shp'.format(outfile[:-4])
             )

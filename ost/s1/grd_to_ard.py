@@ -466,10 +466,14 @@ def _grd_backscatter(
         else:
             dem_nodata = 0.0
     elif product_type == 'GTCgamma':
-        logger.debug('INFO: Calibrating the product to a GTC product (Gamma0).')
+        logger.debug(
+            'INFO: Calibrating the product to a GTC product (Gamma0).'
+        )
         graph = opj(OST_ROOT, 'graphs', 'S1_GRD2ARD', '2_CalGamma.xml')
     elif product_type == 'GTCsigma':
-        logger.debug('INFO: Calibrating the product to a GTC product (Sigma0).')
+        logger.debug(
+            'INFO: Calibrating the product to a GTC product (Sigma0).'
+        )
         graph = opj(OST_ROOT, 'graphs', 'S1_GRD2ARD', '2_CalSigma.xml')
     else:
         logger.debug('ERROR: Wrong product type selected.')
@@ -480,8 +484,8 @@ def _grd_backscatter(
         command = '{} {} -x -q {} -Pinput="{}" -Pdem=\'{}\' \
                    -Pdem_file=\'{}\' -Pdem_nodata={} -Presampling={} \
                    -Poutput=\'{}\''.format(gpt_file, graph, 2 * os.cpu_count(),
-                                           infile, dem, dem_file, dem_nodata, resampling,
-                                           outfile
+                                           infile, dem, dem_file, dem_nodata,
+                                           resampling, outfile
                                            )
     else:
         command = '{} {} -x -q {} -Pinput=\'{}\' -Poutput=\'{}\''.format(
@@ -495,9 +499,9 @@ def _grd_backscatter(
         logger.debug('INFO: Succesfully calibrated product')
     else:
         logger.debug('ERROR: Backscatter calibration exited with an error. \
-                See {} for Snap Error output'.format(logfile))
+                See {} for Snap Error output'.format(logfile)
+                     )
         sys.exit(103)
-
     return return_code
 
 
@@ -522,9 +526,11 @@ def _grd_speckle_filter(infile, outfile, logfile):
 
     logger.debug('INFO: Applying the Refined-Lee Speckle Filter')
     # contrcut command string
-    command = '{} Speckle-Filter -x -q {} -PestimateENL=true -Pfilter=\'Refined Lee\' \
-              -t \'{}\' \'{}\''.format(gpt_file, 2 * os.cpu_count(),
-                                       outfile, infile)
+    command = '{} Speckle-Filter -x -q {} -PestimateENL=true ' \
+              '-Pfilter=\'Refined Lee\' -t \'{}\' ' \
+              '\'{}\''.format(gpt_file, 2 * os.cpu_count(),
+                              outfile, infile
+                              )
 
     # run command and get return code
     return_code = h.run_command(command, logfile)

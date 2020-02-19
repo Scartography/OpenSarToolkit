@@ -613,7 +613,7 @@ class Sentinel1Scene:
             self.ard_parameters['to_db'] = False
             self.ard_parameters['dem'] = 'SRTM 1Sec HGT'
             self.ard_parameters['resampling'] = SNAP_S1_RESAMPLING_METHODS[2]
-        elif ard_type == 'OST Flat':
+        elif ard_type == 'OST_flat':
             self.ard_parameters['type'] = ard_type
             self.ard_parameters['resolution'] = 20
             self.ard_parameters['border_noise'] = True
@@ -676,9 +676,10 @@ class Sentinel1Scene:
             except Exception as e:
                 raise
         if float(self.center_lat) > 59 or float(self.center_lat) < -59:
-            logger.debug('INFO: Scene is outside SRTM coverage. Will use 30m ASTER'
-                         ' DEM instead.'
-                         )
+            logger.debug(
+                'INFO: Scene is outside SRTM coverage. Will use 30m ASTER'
+                ' DEM instead.'
+            )
             self.ard_parameters['dem'] = 'ASTER 1sec GDEM'
 
         if not self.ard_parameters:
@@ -689,7 +690,8 @@ class Sentinel1Scene:
                          )
             self.set_ard_parameters('OST')
         if self.product_type == 'GRD':
-            if self.ard_parameters['resampling'] not in SNAP_S1_RESAMPLING_METHODS:
+            if self.ard_parameters['resampling'] \
+                    not in SNAP_S1_RESAMPLING_METHODS:
                 self.ard_parameters['resampling'] = 'BILINEAR_INTERPOLATION'
                 logger.debug('WARNING: Invalid resampling method '
                              'using BILINEAR_INTERPOLATION'
@@ -733,7 +735,8 @@ class Sentinel1Scene:
             master products in this condition, returning an ARD with 
             the provided ARD parameters!
             """
-            if self.ard_parameters['resampling'] not in SNAP_S1_RESAMPLING_METHODS:
+            if self.ard_parameters['resampling'] \
+                    not in SNAP_S1_RESAMPLING_METHODS:
                 self.ard_parameters['resampling'] = 'BILINEAR_INTERPOLATION'
                 logger.debug('WARNING: Invalid resampling method '
                              'using BILINEAR_INTERPOLATION'
@@ -762,7 +765,9 @@ class Sentinel1Scene:
             with TemporaryDirectory(dir=temp_dir) as temp:
                 while exception_flag is True:
                     executor_type = 'concurrent_processes'
-                    executor = Executor(executor=executor_type, max_workers=max_workers)
+                    executor = Executor(executor=executor_type,
+                                        max_workers=max_workers
+                                        )
                     if exception_counter > 3 or exception_flag is False:
                         break
                     for swath, b in bursts_dict.items():
