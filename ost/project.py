@@ -308,7 +308,8 @@ class Sentinel1(Generic):
             uname=None,
             pword=None
     ):
-
+        if self.metadata_concurency > 1:
+            concurrent = self.metadata_concurency
         # if an old inventory exists drop download_path
         if 'download_path' in self.inventory:
             self.inventory.drop('download_path', axis=1)
