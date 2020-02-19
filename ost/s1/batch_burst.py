@@ -76,9 +76,6 @@ def _execute_batch_burst_ard(
 
     # loop through dates
     for idx, date in enumerate(dates):
-        burst = burst_inventory.loc[burst_inventory['bid'] == burst
-                                    & (burst_inventory['Date'] == date)
-                                    ]
         m_nr, m_burst_id, b_bbox = burst['BurstNr'], burst['bid'], burst['geometry']
         logger.debug(
             'INFO: Entering burst {} at date {}.'.format(m_burst_id, date)

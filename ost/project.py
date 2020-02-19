@@ -327,6 +327,7 @@ class Sentinel1(Generic):
 
         # to download or not ot download - that is here the question
         if not download_df.any().any():
+            self.missing_scenes = []
             logger.debug('INFO: All scenes are ready for being processed.')    
         else:
             logger.debug(
@@ -340,12 +341,12 @@ class Sentinel1(Generic):
                 uname=uname,
                 pword=pword
             )
-        for id in inventory_df.identifier:
-            for missing in self.missing_scenes:
-                if id.lower() in missing.lower():
-                    self.inventory = inventory_df[
-                        inventory_df.identifier != id
-                    ]
+            for id in inventory_df.identifier:
+                for missing in self.missing_scenes:
+                    if id.lower() in missing.lower():
+                        self.inventory = inventory_df[
+                            inventory_df.identifier != id
+                        ]
         return self
 
     def plot_inventory(self, inventory_df=None, transperancy=0.05, show=False):
@@ -389,6 +390,11 @@ class Sentinel1Batch(Sentinel1):
 
     # processing related functions
     def to_ard(self, subset=None, overwrite=False):
+        logger.debug(
+            'INFO: Starting %s ARD processing for %s',
+            self.ard_parameters['type'], self.product_type
+        )
+
         if overwrite:
             logger.debug(
                 'INFO: Deleting processing folder to start from scratch'
@@ -439,6 +445,10 @@ class Sentinel1Batch(Sentinel1):
                 ard_parameters=self.ard_parameters,
                 data_mount=self.data_mount,
                 max_workers=self.max_workers
+            )
+        logger.debug(
+                'INFO:%s ARD processing for %s DONE in %s!',
+                self.ard_parameters['type'], self.product_type
             )
 
     def create_timeseries(self):
