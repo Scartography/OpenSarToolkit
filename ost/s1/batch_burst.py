@@ -7,6 +7,7 @@ import logging
 import datetime
 import itertools
 from tempfile import TemporaryDirectory
+from retry import retry
 
 import gdal
 
@@ -54,6 +55,7 @@ def burst_to_ard_batch(
         task.result()
 
 
+@retry(tries=3, delay=1, logger=logger)
 def _execute_batch_burst_ard(
         burst,
         burst_inventory,
@@ -109,28 +111,30 @@ def _execute_batch_burst_ard(
             return_code = 0
             return return_code
         with TemporaryDirectory() as temp_dir:
-            # run routine
-            return_code = burst_to_ard.burst_to_ard(
-                master_file=master_file,
-                swath=subswath,
-                master_burst_nr=master_burst_nr,
-                master_burst_id=master_id,
-                master_burst_poly=b_bbox,
-                out_dir=out_dir,
-                out_prefix=master_id,
-                temp_dir=temp_dir,
-                resolution=resolution,
-                product_type=product_type,
-                speckle_filter=speckle_filter,
-                to_db=to_db,
-                ls_mask_create=ls_mask_create,
-                dem=dem,
-            )
-        if return_code != 0:
-            raise RuntimeError(
-                'Something went wrong with the GPT processing! '
-                'with return code: %s' % return_code
-            )
+            try:
+                return_code = burst_to_ard.burst_to_ard(
+                    master_file=master_file,
+                    swath=subswath,
+                    master_burst_nr=master_burst_nr,
+                    master_burst_id=master_id,
+                    master_burst_poly=b_bbox,
+                    out_dir=out_dir,
+                    out_prefix=master_id,
+                    temp_dir=temp_dir,
+                    resolution=resolution,
+                    product_type=product_type,
+                    speckle_filter=speckle_filter,
+                    to_db=to_db,
+                    ls_mask_create=ls_mask_create,
+                    dem=dem,
+                )
+            except Exception as e:
+                raise e
+            if return_code != 0:
+                raise RuntimeError(
+                    'Something went wrong with the GPT processing! '
+                    'with return code: %s' % return_code
+                )
         return return_code
 
 
