@@ -5,6 +5,7 @@ import geopandas as gpd
 from shapely.geometry import box
 
 from ost.helpers import scihub, vector as vec
+from ost.s1.s1scene import Sentinel1Scene as S1Scene
 
 logger = logging.getLogger(__name__)
 
@@ -135,7 +136,6 @@ def burst_inventory(inventory_df, outfile, download_dir=os.getenv('HOME'),
 
         # add orbit direction
         single_gdf['Direction'] = orbit_direction
-
         # append
         gdf_full = gdf_full.append(single_gdf)
 
@@ -183,7 +183,8 @@ def refine_burst_inventory(aoi, burst_gdf, outfile):
     # get columns of input dataframe for later return function
     cols = burst_gdf.columns
 
-    # 1) get only intersecting footlogger.debugs (double, since we do this before)
+    # 1) get only intersecting footlogger.debugs
+    # (double, since we do this before)
     burst_gdf = gpd.sjoin(burst_gdf, aoi_gdf, how='inner', op='intersects')
 
     # if aoi  gdf has an id field we need to rename the changed id_left field
