@@ -9,6 +9,8 @@ import itertools
 from tempfile import TemporaryDirectory
 from retry import retry
 
+from godale import Executor
+
 import gdal
 
 from ost.helpers import vector as vec, raster as ras, utils as h
@@ -24,7 +26,7 @@ def burst_to_ard_batch(
         processing_dir,
         ard_parameters,
         data_mount='/eodata',
-        max_workers=os.cpu_count()
+        max_workers=os.cpu_count()/2
 ):
     '''Handles the batch processing of a OST complinat burst inventory file
 
@@ -36,7 +38,8 @@ def burst_to_ard_batch(
         ard_parameters (dict):
 
     '''
-    from godale import Executor
+    if max_workers > os.cpu_count()/2:
+        max_workers = os.cpu_count()/2
     executor_type = 'concurrent_processes'
     executor = Executor(executor=executor_type,
                         max_workers=max_workers
