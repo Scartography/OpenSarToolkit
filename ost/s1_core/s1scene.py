@@ -701,7 +701,13 @@ class Sentinel1Scene:
             with TemporaryDirectory(dir=temp_dir) as temp:
                 if isinstance(filelist, str):
                     filelist = [filelist]
-                if overwrite:
+                # write to class attribute
+                self.ard_dimap = glob.glob(
+                    opj(out_dir, '{}_{}*TC.dim'.format(
+                        self.ard_parameters['product_type'], out_prefix)
+                        )
+                )[0]
+                if overwrite or self.ard_dimap == []:
                     # run the processing
                     return_code = grd_to_ard(
                         filelist,
