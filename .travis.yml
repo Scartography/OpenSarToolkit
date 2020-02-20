@@ -7,9 +7,8 @@ services:
   - docker
 
 before_install:
-  - docker build -t scartography/opensartoolkit:latest .
-  - docker ps -a
-  - docker run scartography/opensartoolkit:latest -c "cd OpenSarToolkit; python setup.py test;"
+  - docker pull scartography/opensartoolkit:latest
+  - docker run scartography/opensartoolkit:latest /bin/sh -c "cd OpenSarToolkit; python setup.py test;"
 
 script:
   - python setup.py test
