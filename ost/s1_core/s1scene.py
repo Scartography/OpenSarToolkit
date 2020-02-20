@@ -24,9 +24,9 @@ from godale import Executor
 from ost.settings import SNAP_S1_RESAMPLING_METHODS
 from ost.helpers import scihub, raster as ras
 from ost.helpers.utils import execute_ard
-from ost.s1.grd_to_ard import grd_to_ard
-from ost.s1.convert_format import ard_to_rgb, ard_to_thumbnail, ard_slc_to_rgb, \
-    ard_slc_to_thumbnail
+from ost.s1_to_ard.grd_to_ard import grd_to_ard
+from ost.s1_core.convert_format import ard_to_rgb, ard_to_thumbnail, \
+    ard_slc_to_rgb, ard_slc_to_thumbnail
 from ost.helpers.bursts import get_bursts_by_polygon
 
 logger = logging.getLogger(__name__)
@@ -137,9 +137,15 @@ class Sentinel1Scene:
         #    logger.debug('(3) PEPS (CNES, 1 year rolling archive)')
         #    mirror = input(' Type 1, 2 or 3: ')
 
-        from ost.s1 import s1_dl
+        from ost.s1_core import s1_dl
         df = pd.DataFrame({'identifier': [self.scene_id]})
-        s1_dl.download_sentinel1(df, download_dir, mirror=mirror)
+        self.download_dir, self.missing_scenes = s1_dl.download_sentinel1(
+            df, download_dir, mirror=mirror
+        )
+        for missing in self.missing_scenes:
+            if missing in inventory_df.identifier:
+                inventory_df = inventory_df[inventory_df.identifier != missing]
+        return self
 
     # location of file (including diases)
     def _download_path(self, download_dir, mkdir=False):
@@ -607,7 +613,7 @@ class Sentinel1Scene:
             self.ard_parameters['to_db'] = False
             self.ard_parameters['dem'] = 'SRTM 1Sec HGT'
             self.ard_parameters['resampling'] = SNAP_S1_RESAMPLING_METHODS[2]
-        elif ard_type == 'OST Flat':
+        elif ard_type == 'OST_flat':
             self.ard_parameters['type'] = ard_type
             self.ard_parameters['resolution'] = 20
             self.ard_parameters['border_noise'] = True
@@ -656,7 +662,8 @@ class Sentinel1Scene:
             temp_dir=None,
             subset=None,
             polar='VV,VH,HH,HV',
-            max_workers=int(os.cpu_count()/2)
+            max_workers=int(os.cpu_count()/2),
+            overwrite=False
     ):
         out_paths = []
         if subset is not None:
@@ -670,9 +677,10 @@ class Sentinel1Scene:
             except Exception as e:
                 raise
         if float(self.center_lat) > 59 or float(self.center_lat) < -59:
-            logger.debug('INFO: Scene is outside SRTM coverage. Will use 30m ASTER'
-                         ' DEM instead.'
-                         )
+            logger.debug(
+                'INFO: Scene is outside SRTM coverage. Will use 30m ASTER'
+                ' DEM instead.'
+            )
             self.ard_parameters['dem'] = 'ASTER 1sec GDEM'
 
         if not self.ard_parameters:
@@ -683,7 +691,8 @@ class Sentinel1Scene:
                          )
             self.set_ard_parameters('OST')
         if self.product_type == 'GRD':
-            if self.ard_parameters['resampling'] not in SNAP_S1_RESAMPLING_METHODS:
+            if self.ard_parameters['resampling'] \
+                    not in SNAP_S1_RESAMPLING_METHODS:
                 self.ard_parameters['resampling'] = 'BILINEAR_INTERPOLATION'
                 logger.debug('WARNING: Invalid resampling method '
                              'using BILINEAR_INTERPOLATION'
@@ -692,31 +701,41 @@ class Sentinel1Scene:
             with TemporaryDirectory(dir=temp_dir) as temp:
                 if isinstance(filelist, str):
                     filelist = [filelist]
-                # run the processing
-                return_code = grd_to_ard(
-                    filelist,
-                    out_dir,
-                    out_prefix,
-                    temp,
-                    self.ard_parameters['resolution'],
-                    self.ard_parameters['resampling'],
-                    self.ard_parameters['product_type'],
-                    self.ard_parameters['ls_mask_create'],
-                    self.ard_parameters['speckle_filter'],
-                    self.ard_parameters['dem'],
-                    self.ard_parameters['to_db'],
-                    self.ard_parameters['border_noise'],
-                    subset=subset,
-                    polarisation=polar
-                )
-                if return_code != 0:
-                    raise RuntimeError(
-                        'Something went wrong with the GPT processing! '
-                        'with return code: %s' % return_code
-                    )
                 # write to class attribute
-                self.ard_dimap = glob.glob(opj(out_dir, '{}*TC.dim'
-                                               .format(out_prefix)))[0]
+                self.ard_dimap = glob.glob(
+                    opj(out_dir, '{}*{}*TC.dim'.format(
+                        out_prefix, self.ard_parameters['product_type'])
+                        )
+                )
+                if overwrite or len(self.ard_dimap) == 0:
+                    # run the processing
+                    return_code = grd_to_ard(
+                        filelist,
+                        out_dir,
+                        out_prefix,
+                        temp,
+                        self.ard_parameters['resolution'],
+                        self.ard_parameters['resampling'],
+                        self.ard_parameters['product_type'],
+                        self.ard_parameters['ls_mask_create'],
+                        self.ard_parameters['speckle_filter'],
+                        self.ard_parameters['dem'],
+                        self.ard_parameters['to_db'],
+                        self.ard_parameters['border_noise'],
+                        subset=subset,
+                        polarisation=polar
+                    )
+                    if return_code != 0:
+                        raise RuntimeError(
+                            'Something went wrong with the GPT processing! '
+                            'with return code: %s' % return_code
+                        )
+                # write to class attribute
+                self.ard_dimap = glob.glob(
+                    opj(out_dir, '{}*{}*TC.dim'.format(
+                        out_prefix, self.ard_parameters['product_type'])
+                        )
+                )[0]
                 if not os.path.isfile(self.ard_dimap):
                     raise RuntimeError
                 out_paths.append(self.ard_dimap)
@@ -727,7 +746,8 @@ class Sentinel1Scene:
             master products in this condition, returning an ARD with 
             the provided ARD parameters!
             """
-            if self.ard_parameters['resampling'] not in SNAP_S1_RESAMPLING_METHODS:
+            if self.ard_parameters['resampling'] \
+                    not in SNAP_S1_RESAMPLING_METHODS:
                 self.ard_parameters['resampling'] = 'BILINEAR_INTERPOLATION'
                 logger.debug('WARNING: Invalid resampling method '
                              'using BILINEAR_INTERPOLATION'
@@ -756,7 +776,9 @@ class Sentinel1Scene:
             with TemporaryDirectory(dir=temp_dir) as temp:
                 while exception_flag is True:
                     executor_type = 'concurrent_processes'
-                    executor = Executor(executor=executor_type, max_workers=max_workers)
+                    executor = Executor(executor=executor_type,
+                                        max_workers=max_workers
+                                        )
                     if exception_counter > 3 or exception_flag is False:
                         break
                     for swath, b in bursts_dict.items():

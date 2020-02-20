@@ -10,12 +10,13 @@ import time
 import gdal
 import datetime
 import logging
-from tqdm import tqdm
+from tqdm.auto import tqdm
 from datetime import timedelta
 from pathlib import Path
 import zipfile
 
-from ost.s1.burst_to_ard import burst_to_ard
+from ost.s1_to_ard.burst_to_ard import burst_to_ard
+
 
 logger = logging.getLogger(__name__)
 
@@ -399,8 +400,8 @@ def execute_ard(
     )
     if return_code != 0:
         raise RuntimeError(
-            'Something went wrong with the GPT processing! with return code: %s' %
-            return_code
+            'Something went wrong with the GPT processing! '
+            'with return code: %s' % return_code
         )
     if not os.path.isfile(out_file):
         raise RuntimeError

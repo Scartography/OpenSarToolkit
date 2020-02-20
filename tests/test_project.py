@@ -46,13 +46,61 @@ def test_sentinel_generic_class(some_bounds):
         del sen1
 
 
+def test_sentinel1_slc_batch(some_bounds):
+    with TemporaryDirectory(dir=os.getcwd()) as temp, \
+            TemporaryDirectory(dir=os.getcwd()) as dl_temp, \
+            TemporaryDirectory(dir=os.getcwd()) as inv_temp:
+        sen1 = SenBatch(
+            project_dir=temp,
+            aoi=box(
+                some_bounds[0], some_bounds[1], some_bounds[2], some_bounds[3]
+            ).wkt,
+            start='2020-01-01',
+            end='2020-01-04',
+            data_mount='/eodata',
+            download_dir=dl_temp,
+            mirror=2,
+            inventory_dir=inv_temp,
+            processing_dir=temp,
+            product_type='SLC',
+            beam_mode='IW',
+            polarisation='VV,VH',
+            ard_type='OST'
+        )
+        sen1.search(outfile=opj(inv_temp, 'inventory.shp'),
+                    append=False,
+                    uname=HERBERT_USER['uname'],
+                    pword=HERBERT_USER['pword']
+                    )
+        sen1.refine(
+            exclude_marginal=True,
+            full_aoi_crossing=True,
+            mosaic_refine=True,
+            area_reduce=0.05
+        )
+        sen1.create_burst_inventory(key='ASCENDING_VVVH', refine=True)
+        sen1.download(mirror=sen1.mirror,
+                      concurrent=sen1.metadata_concurency,
+                      uname=HERBERT_USER['uname'],
+                      pword=HERBERT_USER['asf_pword']
+                      )
+        sen1.to_ard(
+            subset=box(
+                some_bounds[0], some_bounds[1], some_bounds[2], some_bounds[3]
+            ).wkt,
+            overwrite=True
+        )
+
+
 def test_sentinel1_grd_batch(some_bounds):
     with TemporaryDirectory(dir=os.getcwd()) as temp, \
             TemporaryDirectory(dir=os.getcwd()) as dl_temp, \
             TemporaryDirectory(dir=os.getcwd()) as inv_temp:
         sen1 = SenBatch(
             project_dir=temp,
-            aoi=box(some_bounds[0], some_bounds[1], some_bounds[2], some_bounds[3]).wkt,
+            aoi=box(
+                some_bounds[0], some_bounds[1], some_bounds[2], some_bounds[3]
+            ).wkt,
             start='2020-01-01',
             end='2020-01-04',
             data_mount='/eodata',

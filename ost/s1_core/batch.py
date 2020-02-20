@@ -30,7 +30,6 @@ def _to_ard_batch(
     # we create a processing dictionary,
     # where all frames are grouped into acquisitions
     processing_dict = _create_processing_dict(inventory_df)
-
     for track, allScenes in processing_dict.items():
         for list_of_scenes in processing_dict[track]:
             # get acquisition date
@@ -77,7 +76,9 @@ def ards_to_timeseries(
         list_of_scenes = [x for x in list_of_scenes if 'layover' not in x]
         extent = opj(track_dir, '{}.extent.shp'.format(track))
 
-        logger.debug('INFO: Creating common extent mask for track {}'.format(track))
+        logger.debug(
+            'INFO: Creating common extent mask for track {}'.format(track)
+        )
         with TemporaryDirectory() as temp_dir:
             mt_extent(list_of_scenes, extent, temp_dir, -0.0018)
 
@@ -94,7 +95,8 @@ def ards_to_timeseries(
             out_ls = opj(track_dir, '{}.ls_mask.tif'.format(track))
 
             logger.debug(
-                'INFO: Creating common Layover/Shadow mask for track {}'.format(track)
+                'INFO: Creating common Layover/Shadow mask '
+                'for track {}'.format(track)
             )
             with TemporaryDirectory() as temp_dir:
                 mt_layover(
@@ -159,19 +161,23 @@ def timeseries_to_timescan(
             )
             if len(timeseries_vrt) > 1:
                 raise RuntimeError(
-                    'More vrt file per polarization in the timeseries of track: %s',
+                    'More vrt file per polarization in the timeseries '
+                    'of track: %s',
                     track
                 )
             elif len(timeseries_vrt) == 0:
                 logger.debug(
-                    'The %s polarisation is not availible in track %s', polar, track
+                    'The %s polarisation is not availible in track %s',
+                    polar, track
                 )
                 continue
             timeseries_vrt = timeseries_vrt[0]
             if not os.path.isfile(timeseries_vrt):
-                raise RuntimeError('VRT file for timeseries in track %s missing!', track)
+                raise RuntimeError('VRT file for timeseries in track '
+                                   '%s missing!', track)
             logger.debug(
-                'INFO: Processing Timescans of {} for track {}.'.format(polar, track)
+                'INFO: Processing Timescans of {} '
+                'for track {}.'.format(polar, track)
             )
             # create a datelist for harmonics
             scenelist = glob.glob(

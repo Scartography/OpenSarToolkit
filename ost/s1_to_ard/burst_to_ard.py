@@ -156,17 +156,21 @@ def _calibration(infile,
             .format(gpt_file, graph, 2, dem, dem_file,
                     dem_nodata, resampling, region, infile, outfile)
     elif product_type == 'GTCgamma':
-        logger.debug('INFO: Calibrating the product to a GTC product (Gamma0).')
+        logger.debug(
+            'INFO: Calibrating the product to a GTC product (Gamma0).'
+        )
         graph = opj(OST_ROOT, 'graphs', 'S1_SLC2ARD',
-                    'S1_SLC_TNR_CalGamma_Deb.xml')
-        command = '{} {} -x -q {} -Pinput={} -Poutput={}' \
-            .format(gpt_file, graph, 2, infile, outfile)
+                    'S1_SLC_TNR_CalGamma_Deb_SUB.xml')
+        command = '{} {} -x -q {} -Pregion="{}" -Pinput={} -Poutput={}' \
+            .format(gpt_file, graph, 2, region, infile, outfile)
     elif product_type == 'GTCsigma':
-        logger.debug('INFO: Calibrating the product to a GTC product (Sigma0).')
+        logger.debug(
+            'INFO: Calibrating the product to a GTC product (Sigma0).'
+        )
         graph = opj(OST_ROOT, 'graphs', 'S1_SLC2ARD',
-                    'S1_SLC_TNR_CalSigma_Deb.xml')
-        command = '{} {} -x -q {} -Pinput={} -Poutput={}' \
-            .format(gpt_file, graph, 2, infile, outfile)
+                    'S1_SLC_TNR_CalSigma_Deb_SUB.xml')
+        command = '{} {} -x -q {} -Pregion="{}" -Pinput={} -Poutput={}' \
+            .format(gpt_file, graph, 2, region, infile, outfile)
     else:
         logger.debug('ERROR: Wrong product type selected.')
         sys.exit(121)
@@ -205,9 +209,9 @@ def _speckle_filter(infile, outfile, logfile):
 
     logger.debug('INFO: Applying the Refined-Lee Speckle Filter')
     # contrcut command string
-    command = '{} Speckle-Filter -x -q {} -PestimateENL=true -Pfilter=\'Refined Lee\' \
-              -t \'{}\' \'{}\''.format(gpt_file, 2,
-                                       outfile, infile)
+    command = '{} Speckle-Filter -x -q {} -PestimateENL=true ' \
+              '-Pfilter=\'Refined Lee\' -t \'{}\' ' \
+              '\'{}\''.format(gpt_file, 2, outfile, infile)
 
     # run command and get return code
     return_code = h.run_command(command, logfile)
@@ -347,7 +351,12 @@ def _coreg(filelist, outfile, logfile, dem='SRTM 1sec HGT'):
     return return_code
 
 
-def _coreg2(master, slave,  outfile, logfile, dem='SRTM 1sec HGT', master_burst_poly=''):
+def _coreg2(master,
+            slave,
+            outfile,
+            logfile, dem='SRTM 1sec HGT',
+            master_burst_poly=''
+            ):
     '''A wrapper around SNAP's back-geocoding co-registration routine
 
     This function takes a list of 2 OST imported Sentinel-1 SLC products
@@ -695,7 +704,9 @@ def burst_to_ard(
         h.remove_folder_content(temp_dir)
         return return_code
     # we move backscatter to final destination
-    h.move_dimap(out_tc, opj(out_dir, '{}_{}_BS'.format(out_prefix, master_burst_id)))
+    h.move_dimap(
+        out_tc, opj(out_dir, '{}_{}_BS'.format(out_prefix, master_burst_id))
+    )
 
     if ls_mask_create:
         # create LS map

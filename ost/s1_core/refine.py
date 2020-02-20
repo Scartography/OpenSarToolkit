@@ -43,13 +43,17 @@ def read_s1_inventory(inputfile):
         out_frame.columns = column_names
 
     elif inputfile[-7:] == '.sqlite':
-        logger.debug('INFO: Importing Sentinel-1 inventory data from spatialite '
-                     'DB file:\n {}'.format(inputfile)
-                     )
+        logger.debug(
+            'INFO: Importing Sentinel-1 inventory data from spatialite '
+            'DB file:\n {}'.format(inputfile
+                                   )
+        )
     # needs to be added
     else:
-        logger.debug('INFO: Importing Sentinel-1 inventory data from PostGreSQL DB '
-                     'table:\n {}'.format(inputfile))
+        logger.debug(
+            'INFO: Importing Sentinel-1 inventory data from PostGreSQL DB '
+            'table:\n {}'.format(inputfile)
+        )
         db_connect = pgHandler()
         sql = 'select * from {}'.format(inputfile)
         out_frame = gpd.GeoDataFrame.from_postgis(sql, db_connect.connection,
@@ -57,7 +61,8 @@ def read_s1_inventory(inputfile):
 
     if len(out_frame) >= 0:
         logger.debug('INFO: Succesfully converted inventory data into a'
-              'GeoPandas Geo-Dataframe.')
+                     'GeoPandas Geo-Dataframe.'
+                     )
 
     return out_frame
 

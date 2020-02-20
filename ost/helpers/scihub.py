@@ -3,13 +3,15 @@ from os.path import join as opj
 import glob
 import getpass
 import datetime
-import multiprocessing
 from urllib import request, parse
 import requests
 import logging
 from http.cookiejar import CookieJar
 import urllib.request as urlreq
 from shapely.wkt import loads
+from retry import retry
+
+from godale import Executor
 
 from ost.helpers import utils as h
 from ost.helpers.utils import TqdmUpTo
@@ -227,6 +229,7 @@ def check_connection(uname, pword):
     return response.status_code
 
 
+@retry(tries=5, delay=1, logger=logger)
 def s1_download(argument_list):
     '''Function to download a single Sentinel-1 product from Copernicus scihub
     This function will download S1 products from ESA's apihub.
@@ -265,8 +268,16 @@ def s1_download(argument_list):
     # check response
     if response.status_code == 401:
         raise ValueError(' ERROR: Username/Password are incorrect.')
+    elif response.status_code == 404:
+        logger.debug(
+            'Product %s missing from the archive, continuing.',
+            filename.split('/')[-1]
+        )
+        return filename.split('/')[-1]
     elif response.status_code != 200:
-        logger.debug('ERROR: Something went wrong, will try again in 30 seconds.')
+        logger.debug(
+            'ERROR: Something went wrong, will try again in 30 seconds.'
+        )
         response.raise_for_status()
 
     password_manager = urlreq.HTTPPasswordMgrWithDefaultRealm()
@@ -288,9 +299,8 @@ def s1_download(argument_list):
         first_byte = os.path.getsize(filename)
     else:
         first_byte = 0
-
     if first_byte >= total_length:
-        return total_length
+        return str('{}.downloaded'.format(filename))
 
     zip_test = 1
     while zip_test is not None and zip_test <= 10:
@@ -302,8 +312,11 @@ def s1_download(argument_list):
             )
 
         # zipFile check
-        logger.debug('INFO: Checking the zip archive of {} for inconsistency'.format(
-            filename))
+        logger.debug(
+            'INFO: Checking the zip archive of {} for inconsistency'.format(
+                filename
+            )
+        )
         zip_test = h.check_zipfile(filename)
 
         # if it did not pass the test, remove the file
@@ -318,53 +331,96 @@ def s1_download(argument_list):
             logger.debug('INFO: {} passed the zip test.'.format(filename))
             with open(str('{}.downloaded'.format(filename)), 'w') as file:
                 file.write('successfully downloaded \n')
+    return str('{}.downloaded'.format(filename))
 
 
-def batch_download(inventory_df, download_dir, uname, pword, concurrent=2):
-    from ost import Sentinel1Scene as S1Scene
-    from ost.helpers import scihub
-    # create list of scenes
-    scenes = inventory_df['identifier'].tolist()
-    check, i = False, 1
-    while check is False and i <= 10:
-        download_list = []
-        for scene_id in scenes:
-            scene = S1Scene(scene_id)
-            filepath = scene._download_path(download_dir, True)
-            try:
-                uuid = (inventory_df['uuid']
-                        [inventory_df['identifier'] == scene_id].tolist()
-                        )
-            except Exception as e:
-                logger.debug(e)
-                uuid = scene.scihub_uuid(scihub.connect(
-                    base_url='https://scihub.copernicus.eu/apihub/',
-                    uname=uname,
-                    pword=pword
-                )
-                )
-            if os.path.exists('{}.downloaded'.format(filepath)):
-                logger.debug('INFO: {} is already downloaded.'
-                             .format(scene.scene_id)
-                             )
-            else:
-                # Create list objects for download
-                download_list.append([uuid, filepath, uname, pword])
-        if download_list:
-            pool = multiprocessing.Pool(processes=concurrent)
-            pool.map(s1_download, download_list)
-        downloaded_scenes = glob.glob(
-            opj(download_dir, 'SAR', '*', '20*', '*', '*',
-                '*.zip.downloaded')
+def scihub_batch_download(
+        inventory_df,
+        download_dir,
+        uname,
+        pword,
+        concurrent=2
+):
+    to_dl_list = _prepare_scenes_to_dl(
+        inventory_df=inventory_df,
+        download_dir=download_dir,
+        uname=uname,
+        pword=pword
+    )
+    missing_scenes = []
+    executor_type = 'concurrent_threads'
+    executor = Executor(executor=executor_type, max_workers=concurrent)
+    for task in executor.as_completed(
+            func=s1_download,
+            iterable=to_dl_list,
+            fargs=()
+
+    ):
+        downloaded_string = task.result()
+        if not downloaded_string.endswith('downloaded'):
+            missing_scenes.append(downloaded_string)
+
+    downloaded_scenes = glob.glob(
+        opj(download_dir, 'SAR', '*', '20*', '*', '*',
+            '*.zip.downloaded')
+    )
+    check_flag = _check_downloaded_files(
+        inventory_df,
+        download_dir,
+        downloaded_scenes,
+        missing_scenes
+    )
+    if check_flag is False:
+        logger.debug(
+            'Some products are missing from the archive: %s', missing_scenes
         )
-        if len(inventory_df['identifier'].tolist()) == len(downloaded_scenes):
-            logger.debug('INFO: All products are downloaded.')
-            check = True
+    return missing_scenes
+
+
+def _prepare_scenes_to_dl(inventory_df, download_dir, uname, pword):
+    from ost import Sentinel1Scene as S1Scene
+    scenes = inventory_df['identifier'].tolist()
+    download_list = []
+    for scene_id in scenes:
+        scene = S1Scene(scene_id)
+        filepath = scene._download_path(download_dir, True)
+        try:
+            uuid = (inventory_df['uuid']
+                    [inventory_df['identifier'] == scene_id].tolist()
+                    )
+        except Exception as e:
+            logger.debug(e)
+            uuid = scene.scihub_uuid(connect(
+                base_url='https://scihub.copernicus.eu/apihub/',
+                uname=uname,
+                pword=pword
+            )
+            )
+        if os.path.exists('{}.downloaded'.format(filepath)):
+            logger.debug('INFO: {} is already downloaded.'
+                         .format(scene.scene_id)
+                         )
         else:
-            check = False
-            for scene in scenes:
-                scene = S1Scene(scene)
-                filepath = scene._download_path(download_dir)
-                if os.path.exists('{}.downloaded'.format(filepath)):
-                    scenes.remove(scene.scene_id)
-        i += 1
+            # Create list objects for download
+            download_list.append([uuid, filepath, uname, pword])
+    return download_list
+
+
+def _check_downloaded_files(inventory_df,
+                            download_dir,
+                            downloaded_scenes,
+                            missing_scenes
+                            ):
+    from ost import Sentinel1Scene as S1Scene
+    scenes = inventory_df['identifier'].tolist()
+    if len(inventory_df['identifier'].tolist()) == len(downloaded_scenes) and not missing_scenes:
+        logger.debug('INFO: All products are downloaded.')
+        check = True
+    else:
+        check = False
+    for scene in scenes:
+        scene = S1Scene(scene)
+        filepath = scene._download_path(download_dir)
+        if os.path.exists('{}.downloaded'.format(filepath)):
+            scenes.remove(scene.scene_id)
+    return check

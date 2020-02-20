@@ -4,7 +4,7 @@ from tempfile import TemporaryDirectory
 
 from shapely.geometry import box
 
-from ost.s1.burst_to_ard import burst_to_ard
+from ost.s1_to_ard.burst_to_ard import burst_to_ard
 from ost.errors import GPTRuntimeError
 
 
