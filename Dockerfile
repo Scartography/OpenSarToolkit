@@ -71,7 +71,6 @@ RUN cd $HOME && \
     git clone https://github.com/Scartography/OpenSarToolkit.git && \
     cd $HOME/OpenSarToolkit && \
     pip install setuptools && \
-    git checkout timeseries_tests && \
     pip install -r requirements.txt && \
     pip install -r requirements_test.txt && \
     python setup.py install && \
