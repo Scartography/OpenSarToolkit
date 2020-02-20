@@ -8,9 +8,10 @@ from os.path import join as opj
 from datetime import datetime
 from shapely.wkt import loads
 
-from ost.s1 import burst
-from ost.s1 import search, refine, s1_dl, batch
-from ost.s1.batch import _to_ard_batch
+from ost.helpers.bursts import burst_inventory, refine_burst_inventory
+from ost.s1_core import search, refine, s1_dl, batch
+from ost.s1_core.batch import _to_ard_batch
+from ost.s1_core.batch_burst import burst_to_ard_batch
 from ost.helpers import scihub, utils as h, vector as vec
 from ost.multitemporal.utils import create_timeseries_animation
 from ost.settings import SNAP_S1_RESAMPLING_METHODS, ARD_TIMESCAN_METRICS
@@ -45,15 +46,18 @@ class Generic():
             # get lowres data
             world = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
             country = world.name[world.iso_a3 == aoi].values[0]
-            logger.debug('INFO: Getting the country boundaries from Geopandas low'
-                         'resolution data for {}'.format(country)
-                         )
+            logger.debug(
+                'INFO: Getting the country boundaries from Geopandas low'
+                'resolution data for {}'.format(country)
+            )
 
             self.aoi = (world['geometry']
                         [world['iso_a3'] == aoi].values[0].to_wkt())
         elif aoi.split('.')[-1] == 'shp':
             self.aoi = str(vec.shp_to_wkt(aoi))
-            logger.debug('INFO: Using {} shapefile as Area of Interest definition.')
+            logger.debug(
+                'INFO: Using {} shapefile as Area of Interest definition.'
+            )
         else:
             try:
                 loads(str(aoi))
@@ -185,6 +189,8 @@ class Sentinel1(Generic):
         self.coverages = None
 
         # Remote/Download options
+        self.uname = None
+        self.pword = None
         self.mirror = mirror
         self.metadata_concurency = metadata_concurency
 
@@ -195,6 +201,11 @@ class Sentinel1(Generic):
             uname=None,
             pword=None
     ):
+        if self.uname is not None:
+            uname = self.uname
+        if self.pword is not None:
+            pword = self.pword
+
         if outfile is None:
             outfile = opj(self.inventory_dir, 'full_inventory.shp')
 
@@ -212,17 +223,19 @@ class Sentinel1(Generic):
         query = scihub.create_query('Sentinel-1', aoi_str, toi_str,
                                     product_specs_str
                                     )
-        if not uname or not pword:
+        if uname is None or pword is None:
             # ask for username and password
-            uname, pword = scihub.ask_credentials()
+            self.uname, self.pword = scihub.ask_credentials()
+        else:
+            self.uname, self.pword = uname, pword
 
         # do the search
         self.inventory_file = opj(self.inventory_dir, outfile)
         search.scihub_catalogue(query,
                                 self.inventory_file,
                                 append,
-                                uname,
-                                pword
+                                self.uname,
+                                self.pword
                                 )
         
         # read inventory into the inventory attribute
@@ -269,8 +282,11 @@ class Sentinel1(Generic):
             download_size = self.inventory[
                 'size'].str.replace('GB', '').astype('float32').sum()
 
-        logger.debug('INFO: There are about {} GB need to be downloaded.'.format(
-                download_size))
+        logger.debug(
+            'INFO: There are about {} GB need to be downloaded.'.format(
+                download_size
+            )
+        )
 
     def refine(self,
                exclude_marginal=True,
@@ -304,7 +320,8 @@ class Sentinel1(Generic):
             uname=None,
             pword=None
     ):
-
+        if self.metadata_concurency > 1:
+            concurrent = self.metadata_concurency
         # if an old inventory exists drop download_path
         if 'download_path' in self.inventory:
             self.inventory.drop('download_path', axis=1)
@@ -322,16 +339,27 @@ class Sentinel1(Generic):
 
         # to download or not ot download - that is here the question
         if not download_df.any().any():
+            self.missing_scenes = []
             logger.debug('INFO: All scenes are ready for being processed.')    
         else:
-            logger.debug('INFO: One or more of your scenes need to be downloaded.')
-            s1_dl.download_sentinel1(download_df,
-                                     self.download_dir,
-                                     mirror=mirror,
-                                     concurrent=concurrent,
-                                     uname=uname,
-                                     pword=pword
-                                     )
+            logger.debug(
+                'INFO: One or more of your scenes need to be downloaded.'
+            )
+            self.download_dir, self.missing_scenes = s1_dl.download_sentinel1(
+                download_df,
+                self.download_dir,
+                mirror=mirror,
+                concurrent=concurrent,
+                uname=uname,
+                pword=pword
+            )
+            for id in inventory_df.identifier:
+                for missing in self.missing_scenes:
+                    if id.lower() in missing.lower():
+                        self.inventory = inventory_df[
+                            inventory_df.identifier != id
+                        ]
+        return self
 
     def plot_inventory(self, inventory_df=None, transperancy=0.05, show=False):
         if inventory_df is None:
@@ -356,13 +384,15 @@ class Sentinel1Batch(Sentinel1):
                  beam_mode='IW',
                  polarisation='*',
                  track='*',
-                 ard_type='OST'
+                 ard_type='OST',
+                 max_workers=os.cpu_count()
                  ):
 
         super().__init__(project_dir, aoi, start, end, data_mount, mirror,
                          metadata_concurency, download_dir, inventory_dir,
                          processing_dir, product_type, beam_mode, polarisation
                          )
+        self.max_workers = max_workers
 
         self.ard_type = ard_type
         self.ard_parameters = {}
@@ -372,8 +402,15 @@ class Sentinel1Batch(Sentinel1):
 
     # processing related functions
     def to_ard(self, subset=None, overwrite=False):
+        logger.debug(
+            'INFO: Starting %s ARD processing for %s',
+            self.ard_parameters['type'], self.product_type
+        )
+
         if overwrite:
-            logger.debug('INFO: Deleting processing folder to start from scratch')
+            logger.debug(
+                'INFO: Deleting processing folder to start from scratch'
+            )
             h.remove_folder_content(self.processing_dir)
 
         if not self.ard_parameters:
@@ -385,8 +422,8 @@ class Sentinel1Batch(Sentinel1):
         # set resolution in degree
         self.center_lat = loads(self.aoi).centroid.y
         if float(self.center_lat) > 59 or float(self.center_lat) < -59:
-            logger.debug('INFO: Scene is outside SRTM coverage. Will use 30m ASTER'
-                         'DEM instead.'
+            logger.debug('INFO: Scene is outside SRTM coverage. '
+                         'Will use 30m ASTER DEM instead.'
                          )
             self.ard_parameters['dem'] = 'ASTER 1sec GDEM'
 
@@ -395,22 +432,16 @@ class Sentinel1Batch(Sentinel1):
                 subset = str(vec.shp_to_wkt(subset, buffer=0.1, envelope=True))
             elif subset.startswith('POLYGON (('):
                 subset = loads(subset).buffer(0.1).to_wkt()
-            elif subset.geom_type == 'MultiPolygon' or subset.geom_type == 'Polygon':
+            elif subset.geom_type == 'MultiPolygon' \
+                    or subset.geom_type == 'Polygon':
                 subset = subset.wkt
             else:
                 logger.debug('ERROR: No valid subset given.'
-                             'Should be either path to a shapefile or a WKT Polygon.'
+                             'Should be either path to a shapefile '
+                             'or a WKT Polygon.'
                              )
                 sys.exit()
-
-        nr_of_processed = len(
-            glob.glob(opj(self.processing_dir, '*', '20*', '.processed')))
-
-        # check and retry function
-        i = 0
-        while len(
-                self.inventory.groupby(['relativeorbit', 'acquisitiondate'])
-        ) > nr_of_processed:
+        if self.product_type == 'GRD':
             _to_ard_batch(
                 self.inventory,
                 self.download_dir,
@@ -418,13 +449,19 @@ class Sentinel1Batch(Sentinel1):
                 self.ard_parameters,
                 subset
             )
-            nr_of_processed = len(
-                glob.glob(opj(self.processing_dir, '*', '20*', '.processed'))
+        elif self.product_type == 'SLC' and not self.burst_inventory.empty:
+            burst_to_ard_batch(
+                burst_inventory=self.burst_inventory,
+                download_dir=self.download_dir,
+                processing_dir=self.processing_dir,
+                ard_parameters=self.ard_parameters,
+                data_mount=self.data_mount,
+                max_workers=self.max_workers
             )
-            i += 1
-            # not more than 5 trys
-            if i == 5:
-                break
+        logger.debug(
+                'INFO:%s ARD processing for %s DONE!',
+                self.ard_parameters['type'], self.product_type
+            )
 
     def create_timeseries(self):
         nr_of_processed = len(
@@ -488,11 +525,15 @@ class Sentinel1Batch(Sentinel1):
                                ):
         if self.product_type != 'SLC':
             raise TypeError('Product needs to be SLC!')
+        if self.uname is not None:
+            uname = self.uname
+        if self.pword is not None:
+            pword = self.pword
 
         if key:
             outfile = opj(self.inventory_dir,
                           'bursts.{}.shp').format(key)
-            self.burst_inventory = burst.burst_inventory(
+            self.burst_inventory = burst_inventory(
                 self.refined_inventory_dict[key],
                 outfile,
                 download_dir=self.download_dir,
@@ -503,20 +544,22 @@ class Sentinel1Batch(Sentinel1):
                           'bursts.full.shp'
                           )
 
-            self.burst_inventory = burst.burst_inventory(
+            self.burst_inventory = burst_inventory(
                 self.inventory,
                 outfile,
                 download_dir=self.download_dir,
                 data_mount=self.data_mount,
-                uname=uname, pword=pword
+                uname=uname,
+                pword=pword
             )
 
         if refine:
             # logger.debug('{}.refined.shp'.format(outfile[:-4]))
-            self.burst_inventory = burst.refine_burst_inventory(
+            self.burst_inventory = refine_burst_inventory(
                 self.aoi, self.burst_inventory,
                 '{}.refined.shp'.format(outfile[:-4])
             )
+        return self
 
     def create_timeseries_animations(self,
                                      shrink_factor=5,

@@ -1,8 +1,3 @@
-# -*- coding: utf-8 -*-
-'''This module handles the burst inventory
-
-'''
-
 import os
 from os.path import join as opj
 import shutil
@@ -11,137 +6,29 @@ import time
 import logging
 import datetime
 import itertools
+from tempfile import TemporaryDirectory
+from retry import retry
+
+from godale import Executor
 
 import gdal
-import geopandas as gpd
 
-from ost.helpers import scihub, vector as vec, raster as ras, utils as h
-from ost.s1 import burst_to_ard, timeseries
+from ost.helpers import vector as vec, raster as ras, utils as h
+from ost.s1_core import timeseries
+from ost.s1_to_ard import burst_to_ard
 from ost import Sentinel1Scene as S1Scene
 
 logger = logging.getLogger(__name__)
 
 
-def burst_inventory(inventory_df, outfile, download_dir=os.getenv('HOME'),
-                    data_mount='/eodata', uname=None, pword=None):
-    '''Creates a Burst GeoDataFrame from an OST inventory file
-
-    Args:
-
-    Returns:
-
-
-    '''
-    # create column names for empty data frame
-    column_names = ['SceneID', 'Track', 'Direction', 'Date', 'SwathID',
-                    'AnxTime', 'BurstNr', 'geometry']
-
-    # crs for empty dataframe
-    crs = {'init': 'epsg:4326', 'no_defs': True}
-    # create empty dataframe
-    gdf_full = gpd.GeoDataFrame(columns=column_names, crs=crs)
-    # uname, pword = scihub.askScihubCreds()
-
-    for scene_id in inventory_df.identifier:
-        # read into S1Scene class
-        scene = S1Scene(scene_id)
-
-        logger.debug('INFO: Getting burst info from {}.'.format(scene.scene_id))
-        
-        # get orbit direction
-        orbit_direction = inventory_df[
-            inventory_df.identifier == scene_id].orbitdirection.values[0]
-
-        filepath = scene.get_path(download_dir, data_mount)
-        if not filepath:
-            logger.debug('INFO: Retrieving burst info from scihub'
-                  '(need to download xml files)')
-            if not uname and not pword:
-                uname, pword = scihub.ask_credentials()
-                
-            opener = scihub.connect(uname=uname, pword=pword)
-            if scene.scihub_online_status(opener) is False:
-                logger.debug('INFO: Product needs to be online'
-                      'to create a burst database.')
-                logger.debug('INFO: Download the product first and '
-                      'do the burst list from the local data.')
-            else:
-                single_gdf = scene._scihub_annotation_get(uname, pword)
-        elif filepath[-4:] == '.zip':
-            single_gdf = scene._zip_annotation_get(download_dir, data_mount)
-        elif filepath[-5:] == '.SAFE':
-            single_gdf = scene._safe_annotation_get(download_dir, data_mount)
-
-        # add orbit direction
-        single_gdf['Direction'] = orbit_direction
-
-        # append
-        gdf_full = gdf_full.append(single_gdf)
-
-    gdf_full = gdf_full.reset_index(drop=True)
-    for i in gdf_full['AnxTime'].unique():
-
-        # get similar burst times
-        idx = gdf_full.index[(gdf_full.AnxTime >= i - 1) &
-                             (gdf_full.AnxTime <= i + 1) &
-                             (gdf_full.AnxTime != i)].unique().values
-
-        # reset all to first value
-        for j in idx:
-            gdf_full.at[j, 'AnxTime'] = i
-
-    # create the acrual burst id
-    gdf_full['bid'] = gdf_full.Direction.str[0] + \
-        gdf_full.Track.astype(str) + '_'+ \
-        gdf_full.SwathID.astype(str) + '_'+ \
-        gdf_full.AnxTime.astype(str)
-
-    # save file to out
-    gdf_full['Date'] = gdf_full['Date'].astype(str)
-    gdf_full['BurstNr'] = gdf_full['BurstNr'].astype(str)
-    gdf_full['AnxTime'] = gdf_full['AnxTime'].astype(str)
-    gdf_full['Track'] = gdf_full['Track'].astype(str)
-    gdf_full.to_file(outfile)
-    
-    return gdf_full
-
-
-def refine_burst_inventory(aoi, burst_gdf, outfile):
-    '''Creates a Burst GeoDataFrame from an OST inventory file
-
-    Args:
-
-    Returns:
-
-
-    '''
-
-    # turn aoi into a geodataframe
-    aoi_gdf = vec.wkt_to_gdf(aoi)
-
-    # get columns of input dataframe for later return function
-    cols = burst_gdf.columns
-
-    # 1) get only intersecting footlogger.debugs (double, since we do this before)
-    burst_gdf = gpd.sjoin(burst_gdf, aoi_gdf, how='inner', op='intersects')
-
-    # if aoi  gdf has an id field we need to rename the changed id_left field
-    if 'id_left'in burst_gdf.columns.tolist():
-        # rename id_left to id
-        burst_gdf.columns = (['id'if x == 'id_left'else x
-                              for x in burst_gdf.columns.tolist()])
-
-    # save file to out
-    burst_gdf['Date'] = burst_gdf['Date'].astype(str)
-    burst_gdf['BurstNr'] = burst_gdf['BurstNr'].astype(str)
-    burst_gdf['AnxTime'] = burst_gdf['AnxTime'].astype(str)
-    burst_gdf['Track'] = burst_gdf['Track'].astype(str)
-    burst_gdf.to_file(outfile)
-    return burst_gdf[cols]
-
-
-def burst_to_ard_batch(burst_inventory, download_dir, processing_dir,
-                       temp_dir, ard_parameters, data_mount='/eodata'):
+def burst_to_ard_batch(
+        burst_inventory,
+        download_dir,
+        processing_dir,
+        ard_parameters,
+        data_mount='/eodata',
+        max_workers=int(os.cpu_count()/2)
+):
     '''Handles the batch processing of a OST complinat burst inventory file
 
     Args:
@@ -152,126 +39,112 @@ def burst_to_ard_batch(burst_inventory, download_dir, processing_dir,
         ard_parameters (dict):
 
     '''
+    if max_workers > os.cpu_count()/2:
+        max_workers = int(os.cpu_count()/2)
+    executor_type = 'concurrent_processes'
+    executor = Executor(executor=executor_type,
+                        max_workers=max_workers
+                        )
+    for task in executor.as_completed(
+            func=_execute_batch_burst_ard,
+            iterable=burst_inventory.iterrows(),
+            fargs=(processing_dir,
+                   download_dir,
+                   data_mount,
+                   ard_parameters,
+                   )
 
+    ):
+        task.result()
+
+
+@retry(tries=3, delay=1, logger=logger)
+def _execute_batch_burst_ard(
+        burst,
+        processing_dir,
+        download_dir,
+        data_mount,
+        ard_parameters
+):
+    index, burst = burst
     resolution = ard_parameters['resolution']
-    # border_noise = ard_parameters['border_noise']
     product_type = ard_parameters['product_type']
     speckle_filter = ard_parameters['speckle_filter']
     ls_mask_create = ard_parameters['ls_mask_create']
     to_db = ard_parameters['to_db']
     dem = ard_parameters['dem']
-    coherence = ard_parameters['coherence']
-    polarimetry = ard_parameters['polarimetry']
-    pol_speckle_filter = ard_parameters['pol_speckle_filter']
 
-    for burst in burst_inventory.bid.unique():
-        # create a list of dates over which we loop
-        dates = burst_inventory.Date[
-                burst_inventory.bid == burst].sort_values().tolist()
+    logger.debug(
+        'INFO: Entering burst {} at date {}.'.format(
+            burst.BurstNr,  burst.Date
+        )
+    )
+    master_scene = S1Scene(burst.SceneID)
 
-        # loop through dates
-        for idx, date in enumerate(dates):      # ******
-            logger.debug('INFO: Entering burst {} at date {}.'.format(burst, date))
-            # get master date
-            master_date = dates[idx]
-            # we set this for handling the end of the time-series
-            end = False
-            coherence = ard_parameters['coherence']
+    # get path to file
+    master_file = master_scene.get_path(download_dir, data_mount)
+    # get subswath
+    subswath = burst.SwathID
+    # get burst number in file
+    master_burst_nr = burst.BurstNr
+    # create a fileId
+    master_id = '{}_{}'.format(burst.Date, burst.bid)
+    # create out folder
+    out_dir = '{}/{}/{}'.format(processing_dir, burst.bid, burst.Date)
+    os.makedirs(out_dir, exist_ok=True)
 
-            # try to get slave date
-            try:
-                slave_date = dates[idx + 1]    # last burst in timeseries?
-            except IndexError:
-                end = True
-                logger.debug('INFO: Reached the end of the time-series.'
-                      'Therefore no coherence calculation is done.')
-            else:
-                end = False
-
-            # read master burst
-            master_burst = burst_inventory[
-                (burst_inventory.Date == master_date) &
-                (burst_inventory.bid == burst)]
-
-            master_scene = S1Scene(master_burst.SceneID.values[0])
-
-            # get path to file
-            master_file = master_scene.get_path(download_dir, data_mount)
-            # get subswath
-            subswath = master_burst.SwathID.values[0]
-            # get burst number in file
-            master_burst_nr = master_burst.BurstNr.values[0]
-            # create a fileId
-            master_id = '{}_{}'.format(master_date, master_burst.bid.values[0])
-
-            # create out folder
-            out_dir = '{}/{}/{}'.format(processing_dir, burst, date)
-            os.makedirs(out_dir, exist_ok=True)
-
-            # check if already processed
-            if os.path.isfile(opj(out_dir, '.processed')):
-                logger.debug('INFO: Burst {} from {} already processed'.format(
-                    burst, date))
-                # return_code = 0
-            else:
-                if end is True:
-                    coherence = False
-                    slave_file, slave_burst_nr, slave_id = None, None, None
-                else:
-                    # read slave burst
-                    slave_burst = burst_inventory[
-                            (burst_inventory.Date == slave_date) &
-                            (burst_inventory.bid == burst)]
-
-                    slave_scene = S1Scene(slave_burst.SceneID.values[0])
-
-                    # get path to slave file
-                    slave_file = slave_scene.get_path(download_dir,
-                                                      data_mount)
-
-                    # burst number in slave file (subswath is same)
-                    slave_burst_nr = slave_burst.BurstNr.values[0]
-
-                    # outfile name
-                    slave_id = '{}_{}'.format(slave_date,
-                                              slave_burst.bid.values[0])
-
-                # run routine
-                burst_to_ard.burst_to_ard(
-                     master_file=master_file,
-                     swath=subswath,
-                     master_burst_nr=master_burst_nr,
-                     master_burst_id=master_id,
-                     out_dir=out_dir,
-                     temp_dir=temp_dir,
-                     slave_file=slave_file,
-                     slave_burst_nr=slave_burst_nr,
-                     slave_burst_id=slave_id,
-                     coherence=coherence,
-                     polarimetry=polarimetry,
-                     pol_speckle_filter=pol_speckle_filter,
-                     resolution=resolution,
-                     product_type=product_type,
-                     speckle_filter=speckle_filter,
-                     to_db=to_db,
-                     ls_mask_create=ls_mask_create,
-                     dem=dem,
-                     remove_slave_import=False)
-
-    # return return_code
+    # check if already processed
+    if os.path.isfile(opj(out_dir, '.processed')):
+        logger.debug('INFO: Burst {} from {} already processed'.format(
+            burst.bid, burst.Date))
+        return_code = 0
+        return return_code
+    with TemporaryDirectory() as temp_dir:
+        try:
+            return_code = burst_to_ard.burst_to_ard(
+                master_file=master_file,
+                swath=subswath,
+                master_burst_nr=burst['BurstNr'],
+                master_burst_id=master_id,
+                master_burst_poly=burst['geometry'],
+                out_dir=out_dir,
+                out_prefix=master_id,
+                temp_dir=temp_dir,
+                resolution=resolution,
+                product_type=product_type,
+                speckle_filter=speckle_filter,
+                to_db=to_db,
+                ls_mask_create=ls_mask_create,
+                dem=dem,
+            )
+        except Exception as e:
+            raise e
+        if return_code != 0:
+            raise RuntimeError(
+                'Something went wrong with the GPT processing! '
+                'with return code: %s' % return_code
+            )
+    return return_code
 
 
-def _ard_to_ts(burst_inventory, processing_dir, temp_dir,
-               burst, to_db, ls_mask_create, ls_mask_apply, mt_speckle_filter,
-               datatype):
-
+def _ard_to_ts(
+        burst_inventory,
+        processing_dir,
+        temp_dir,
+        burst,
+        to_db,
+        ls_mask_create,
+        ls_mask_apply,
+        mt_speckle_filter,
+        datatype
+):
     burst_dir = opj(processing_dir, burst)
     
     # get common burst extent
     list_of_scenes = glob.glob(opj(burst_dir, '20*', '*data*', '*img'))
     list_of_scenes = [x for x in list_of_scenes if 'layover'not in x]
     extent = opj(burst_dir, '{}.extent.shp'.format(burst))
-    timeseries.mt_extent(list_of_scenes, extent, temp_dir, buffer=-0.0018)
+    timeseries.mt_extent(list_of_scenes, extent, buffer=-0.0018)
 
     # remove inital extent
     for file in glob.glob(opj(burst_dir, 'tmp*')):
@@ -282,12 +155,14 @@ def _ard_to_ts(burst_inventory, processing_dir, temp_dir,
         list_of_scenes = glob.glob(opj(burst_dir, '20*', '*data*', '*img'))
         list_of_layover = [x for x in list_of_scenes if 'layover'in x]
         out_ls = opj(burst_dir, '{}.ls_mask.tif'.format(burst))
-        timeseries.mt_layover(list_of_layover, out_ls, temp_dir, extent=extent)
+        timeseries.mt_layover(list_of_layover, out_ls, extent=extent)
         logger.debug('INFO: Our common layover mask is located at {}'.format(
               out_ls))
 
     if ls_mask_apply:
-        logger.debug('INFO: Calculating symetrical difference of extent and ls_mask')
+        logger.debug(
+            'INFO: Calculating symetrical difference of extent and ls_mask'
+        )
         ras.polygonize_raster(out_ls, '{}.shp'.format(out_ls[:-4]))
         extent_ls_masked = opj(burst_dir, '{}.extent.masked.shp'.format(burst))
         vec.difference(extent, '{}.shp'.format(out_ls[:-4]), extent_ls_masked)
@@ -298,31 +173,24 @@ def _ard_to_ts(burst_inventory, processing_dir, temp_dir,
 
     # we loop through each possible product
     for p, product_name in list_of_product_types.items():
-
         # we loop through each polarisation
         for pol in ['VV', 'VH', 'HH', 'HV']:
-
             # see if there is actually any imagery
             list_of_ts_bursts = sorted(glob.glob(
                 opj(processing_dir, burst, '20*', '*data*', '{}*{}*img'
                     .format(product_name, pol))))
-
             if len(list_of_ts_bursts) > 1:
-
                 # check for all datafiles of this product type
                 list_of_ts_bursts = sorted(glob.glob(
                     opj(processing_dir, burst, '20*/', '*{}*dim'.format(
                             p))))
                 list_of_ts_bursts = '\'{}\''.format(
                     ','.join(list_of_ts_bursts))
-
                 # define out_dir for stacking routine
 
                 out_dir = opj(processing_dir,
                               '{}/Timeseries'.format(burst))
                 os.makedirs(out_dir, exist_ok=True)
-
-                # create namespaces
 
                 temp_stack = opj(temp_dir,
                                  '{}_{}_{}_mt'.format(burst, p, pol))
@@ -335,8 +203,11 @@ def _ard_to_ts(burst_inventory, processing_dir, temp_dir,
                                     burst, p, pol))
 
                 # run stacking routines
-                ts.create_stack(list_of_ts_bursts, temp_stack, stack_log,
-                                polarisation=pol)
+                ts.create_stack(list_of_ts_bursts,
+                                temp_stack,
+                                stack_log,
+                                polarisation=pol
+                                )
 
                 # run mt speckle filter
                 if mt_speckle_filter is True:
@@ -369,7 +240,8 @@ def _ard_to_ts(burst_inventory, processing_dir, temp_dir,
                         # restructure date to YYMMDD
                         in_date = datetime.datetime.strptime(date, '%d%b%Y')
                         out_date = datetime.datetime.strftime(in_date,
-                                                             '%y%m%d')
+                                                              '%y%m%d'
+                                                              )
 
                         infile = glob.glob(opj('{}.data'.format(out_stack),
                                                '*{}*{}*img'.format(
@@ -380,12 +252,15 @@ def _ard_to_ts(burst_inventory, processing_dir, temp_dir,
                             i, out_date, p, pol))
 
                         # mask by extent
-                        ras.mask_by_shape(
+                        ras.to_gtiff_clip_by_extend(
                             infile, outfile,
                             extent,
-                            to_db=to_db, datatype=datatype,
-                            min_value=-30, max_value=5,
-                            ndv=0)
+                            to_db=to_db,
+                            out_dtype=datatype,
+                            min_value=-30,
+                            max_value=5,
+                            no_data=0.0
+                        )
                         # add ot a list for subsequent vrt creation
                         outfiles.append(outfile)
 
@@ -437,12 +312,15 @@ def _ard_to_ts(burst_inventory, processing_dir, temp_dir,
                         outfile = opj(out_dir, '{}.{}.{}.{}.{}.tif'.format(
                             i, outMst, outSlv, p, pol))
 
-                        ras.mask_by_shape(
+                        ras.to_gtiff_clip_by_extend(
                             infile, outfile,
                             extent,
-                            to_db=False, datatype=datatype,
-                            min_value=0.000001, max_value=1,
-                            ndv=0)
+                            to_db=False,
+                            out_dtype=datatype,
+                            min_value=0.000001,
+                            max_value=1,
+                            no_data=0.0
+                        )
 
                         # add ot a list for subsequent vrt creation
                         outfiles.append(outfile)
@@ -462,13 +340,12 @@ def _ard_to_ts(burst_inventory, processing_dir, temp_dir,
                 h.delete_dimap(out_stack)
 
     for pol in ['Alpha', 'Entropy', 'Anisotropy']:
-
         list_of_ts_bursts = sorted(glob.glob(
             opj(processing_dir, burst, '20*',
-                '*{}*'.format(p), '*{}.img'.format(pol))))
+                '*{}*'.format(p), '*{}.img'.format(pol)))
+        )
 
         if len(list_of_ts_bursts) > 1:
-
             list_of_ts_bursts = sorted(glob.glob(
                 opj(processing_dir, burst, '20*/', '*{}*dim'.format(p))))
             list_of_ts_bursts = '\'{}\''.format(','.join(
@@ -485,8 +362,11 @@ def _ard_to_ts(burst_inventory, processing_dir, temp_dir,
             stack_log = opj(out_dir,
                             '{}_{}_stack.err_log'.format(burst, pol))
             # processing routines
-            ts.create_stack(list_of_ts_bursts, temp_stack, stack_log,
-                            pattern=pol)
+            ts.create_stack(list_of_ts_bursts,
+                            temp_stack,
+                            stack_log,
+                            pattern=pol
+                            )
 
             if mt_speckle_filter is True:
                 speckle_log = opj(out_dir,
@@ -522,11 +402,16 @@ def _ard_to_ts(burst_inventory, processing_dir, temp_dir,
                         i, out_date, p, pol))
                 # mask by extent
                 max_value = 90 if pol is 'Alpha'else 1
-                ras.mask_by_shape(
-                    infile, outfile,
+                ras.to_gtiff_clip_by_extend(
+                    infile,
+                    outfile,
                     extent,
-                    to_db=False, datatype=datatype, min_value=0.000001,
-                    max_value=max_value, ndv=0)
+                    to_db=False,
+                    out_dtype=datatype,
+                    min_value=0.000001,
+                    max_value=max_value,
+                    no_data=0
+                )
 
                 # add ot a list for subsequent vrt creation
                 outfiles.append(outfile)
@@ -557,24 +442,33 @@ def burst_ards_to_timeseries(burst_inventory, processing_dir, temp_dir,
     ls_mask_apply = ard_parameters['ls_mask_apply']
     mt_speckle_filter = ard_parameters['mt_speckle_filter']
 
-    for burst in burst_inventory.bid.unique():      # ***
+    for burst in burst_inventory.bid.unique():
+        _ard_to_ts(
+            burst_inventory,
+            processing_dir,
+            temp_dir,
+            burst,
+            to_db_mt,
+            ls_mask_create,
+            ls_mask_apply,
+            mt_speckle_filter,
+            datatype
+        )
 
-        #if os.path.isfile(opj(burst_dir, 'Timeseries', '.processed')):
-        #    logger.debug('INFO: Timeseries for track {} already processed.'.format(burst))
-        #else:
-        _ard_to_ts(burst_inventory, processing_dir, temp_dir,
-               burst, to_db_mt, ls_mask_create, ls_mask_apply,
-               mt_speckle_filter, datatype)
 
-
-# --------------------
-# timescan part
-# --------------------
-def _timeseries_to_timescan(burst_inventory, processing_dir, temp_dir,
-                            burst_dir, to_db, metrics, outlier_removal):
+def _timeseries_to_timescan(
+        burst_inventory,
+        processing_dir,
+        temp_dir,
+        burst_dir,
+        to_db,
+        metrics,
+        outlier_removal
+):
 
     product_list = ['BS.HH', 'BS.VV', 'BS.HV', 'BS.VH',
-                    'coh.VV', 'coh.VH', 'Alpha', 'Entropy', 'Anisotropy']
+                    'coh.VV', 'coh.VH', 'Alpha', 'Entropy', 'Anisotropy'
+                    ]
 
     for product in product_list:
         for timeseries in glob.glob(opj(burst_dir, 'Timeseries',
@@ -706,14 +600,17 @@ def mosaic_timeseries(burst_inventory, processing_dir, temp_dir,
                 os.makedirs(out_dir, exist_ok=True)
                 
                 if start == end:
-                    outfile = opj(out_dir, '{}.{}.{}.tif'.format(i + 1, start, product))
+                    outfile = opj(
+                        out_dir, '{}.{}.{}.tif'.format(i + 1, start, product)
+                    )
                 else:
-                    outfile = opj(out_dir, '{}.{}-{}.{}.tif'.format(i + 1, start, end, product))
-                    
-                    
+                    outfile = opj(
+                        out_dir,
+                        '{}.{}-{}.{}.tif'.format(i + 1, start, end, product)
+                    )
+
                 list_of_files.append(outfile)
                 filelist = ''.join(filelist)
-
                 # the command
                 command = ('otbcli_Mosaic -il {} -comp.feather large '
                            '-tmpdir {} -progress 1 -out {} float'.format(
@@ -728,7 +625,11 @@ def mosaic_timeseries(burst_inventory, processing_dir, temp_dir,
                           options=vrt_options)
 
 
-def mosaic_timescan(burst_inventory, processing_dir, temp_dir, ard_parameters):
+def mosaic_timescan(burst_inventory,
+                    processing_dir,
+                    temp_dir,
+                    ard_parameters
+                    ):
 
     product_list = ['BS.HH', 'BS.VV', 'BS.HV', 'BS.VH',
                     'coh.VV', 'coh.VH', 'Alpha', 'Entropy', 'Anisotropy']

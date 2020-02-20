@@ -1,7 +1,7 @@
 import os
 import argparse
 
-from ost.s1.burst_to_ard import burst_to_ard
+from ost.s1_to_ard.burst_to_ard import burst_to_ard
 
 if __name__ == "__main__":
     # write a description
