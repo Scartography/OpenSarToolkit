@@ -662,7 +662,8 @@ class Sentinel1Scene:
             temp_dir=None,
             subset=None,
             polar='VV,VH,HH,HV',
-            max_workers=int(os.cpu_count()/2)
+            max_workers=int(os.cpu_count()/2),
+            overwrite=False
     ):
         out_paths = []
         if subset is not None:
@@ -700,31 +701,35 @@ class Sentinel1Scene:
             with TemporaryDirectory(dir=temp_dir) as temp:
                 if isinstance(filelist, str):
                     filelist = [filelist]
-                # run the processing
-                return_code = grd_to_ard(
-                    filelist,
-                    out_dir,
-                    out_prefix,
-                    temp,
-                    self.ard_parameters['resolution'],
-                    self.ard_parameters['resampling'],
-                    self.ard_parameters['product_type'],
-                    self.ard_parameters['ls_mask_create'],
-                    self.ard_parameters['speckle_filter'],
-                    self.ard_parameters['dem'],
-                    self.ard_parameters['to_db'],
-                    self.ard_parameters['border_noise'],
-                    subset=subset,
-                    polarisation=polar
-                )
-                if return_code != 0:
-                    raise RuntimeError(
-                        'Something went wrong with the GPT processing! '
-                        'with return code: %s' % return_code
+                if overwrite:
+                    # run the processing
+                    return_code = grd_to_ard(
+                        filelist,
+                        out_dir,
+                        out_prefix,
+                        temp,
+                        self.ard_parameters['resolution'],
+                        self.ard_parameters['resampling'],
+                        self.ard_parameters['product_type'],
+                        self.ard_parameters['ls_mask_create'],
+                        self.ard_parameters['speckle_filter'],
+                        self.ard_parameters['dem'],
+                        self.ard_parameters['to_db'],
+                        self.ard_parameters['border_noise'],
+                        subset=subset,
+                        polarisation=polar
                     )
+                    if return_code != 0:
+                        raise RuntimeError(
+                            'Something went wrong with the GPT processing! '
+                            'with return code: %s' % return_code
+                        )
                 # write to class attribute
-                self.ard_dimap = glob.glob(opj(out_dir, '{}*TC.dim'
-                                               .format(out_prefix)))[0]
+                self.ard_dimap = glob.glob(
+                    opj(out_dir, '{}_{}*TC.dim'.format(
+                        self.ard_parameters['product_type'], out_prefix)
+                        )
+                )[0]
                 if not os.path.isfile(self.ard_dimap):
                     raise RuntimeError
                 out_paths.append(self.ard_dimap)
