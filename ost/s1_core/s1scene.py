@@ -703,11 +703,11 @@ class Sentinel1Scene:
                     filelist = [filelist]
                 # write to class attribute
                 self.ard_dimap = glob.glob(
-                    opj(out_dir, '{}_{}*TC.dim'.format(
-                        self.ard_parameters['product_type'], out_prefix)
+                    opj(out_dir, '{}*{}*TC.dim'.format(
+                        out_prefix, self.ard_parameters['product_type'])
                         )
-                )[0]
-                if overwrite or self.ard_dimap == []:
+                )
+                if overwrite or len(self.ard_dimap) == 0:
                     # run the processing
                     return_code = grd_to_ard(
                         filelist,
@@ -732,8 +732,8 @@ class Sentinel1Scene:
                         )
                 # write to class attribute
                 self.ard_dimap = glob.glob(
-                    opj(out_dir, '{}_{}*TC.dim'.format(
-                        self.ard_parameters['product_type'], out_prefix)
+                    opj(out_dir, '{}*{}*TC.dim'.format(
+                        out_prefix, self.ard_parameters['product_type'])
                         )
                 )[0]
                 if not os.path.isfile(self.ard_dimap):
