@@ -189,6 +189,8 @@ class Sentinel1(Generic):
         self.coverages = None
 
         # Remote/Download options
+        self.uname = None
+        self.pword = None
         self.mirror = mirror
         self.metadata_concurency = metadata_concurency
 
@@ -199,6 +201,11 @@ class Sentinel1(Generic):
             uname=None,
             pword=None
     ):
+        if self.uname is not None:
+            uname = self.uname
+        if self.pword is not None:
+            pword = self.pword
+
         if outfile is None:
             outfile = opj(self.inventory_dir, 'full_inventory.shp')
 
@@ -216,17 +223,19 @@ class Sentinel1(Generic):
         query = scihub.create_query('Sentinel-1', aoi_str, toi_str,
                                     product_specs_str
                                     )
-        if not uname or not pword:
+        if uname is None or pword is None:
             # ask for username and password
-            uname, pword = scihub.ask_credentials()
+            self.uname, self.pword = scihub.ask_credentials()
+        else:
+            self.uname, self.pword = uname, pword
 
         # do the search
         self.inventory_file = opj(self.inventory_dir, outfile)
         search.scihub_catalogue(query,
                                 self.inventory_file,
                                 append,
-                                uname,
-                                pword
+                                self.uname,
+                                self.pword
                                 )
         
         # read inventory into the inventory attribute
@@ -516,6 +525,10 @@ class Sentinel1Batch(Sentinel1):
                                ):
         if self.product_type != 'SLC':
             raise TypeError('Product needs to be SLC!')
+        if self.uname is not None:
+            uname = self.uname
+        if self.pword is not None:
+            pword = self.pword
 
         if key:
             outfile = opj(self.inventory_dir,
@@ -536,7 +549,8 @@ class Sentinel1Batch(Sentinel1):
                 outfile,
                 download_dir=self.download_dir,
                 data_mount=self.data_mount,
-                uname=uname, pword=pword
+                uname=uname,
+                pword=pword
             )
 
         if refine:
