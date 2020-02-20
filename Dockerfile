@@ -15,7 +15,6 @@ ENV TBX="esa-snap_sentinel_unix_${TBX_VERSION}_${TBX_SUBVERSION}.sh" \
 
 RUN sed -i -e 's:(groups):(groups 2>/dev/null):' /etc/bash.bashrc
 
-
 # install gdal as root
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -yq libgdal-dev \
     python3-gdal \
@@ -28,6 +27,23 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -yq libgdal
 RUN fix-permissions $HOME && \
     mkdir $HOME/programs && \
     fix-permissions $HOME/programs
+
+# copy the snap installation config file into the container
+COPY snap7.varfile $HOME/programs/
+
+# Download and install SNAP and ORFEO Toolbox
+RUN cd  $HOME/programs && \
+    wget $SNAP_URL/$TBX && \
+    chmod +x $TBX && \
+    ./$TBX -q -varfile snap7.varfile && \
+    rm $TBX && \
+    rm snap7.varfile && \
+    cd $HOME/programs && \
+    wget https://www.orfeo-toolbox.org/packages/${OTB} && \
+    chmod +x $OTB && \
+    ./${OTB} && \
+    rm -f OTB-${OTB_VERSION}-Linux64.run
+
 USER $NB_UID
 
 RUN conda install  --quiet --yes \
@@ -49,22 +65,6 @@ RUN conda install  --quiet --yes \
 
 # jupyter geojson as regular user
 RUN jupyter labextension install @jupyterlab/geojson-extension
-
-# copy the snap installation config file into the container
-COPY snap7.varfile $HOME/programs/
-
-# Download and install SNAP and ORFEO Toolbox
-RUN cd  $HOME/programs && \
-    wget $SNAP_URL/$TBX && \
-    chmod +x $TBX && \
-    ./$TBX -q -varfile snap7.varfile && \
-    rm $TBX && \
-    rm snap7.varfile && \
-    cd $HOME/programs && \
-    wget https://www.orfeo-toolbox.org/packages/${OTB} && \
-    chmod +x $OTB && \
-    ./${OTB} && \
-    rm -f OTB-${OTB_VERSION}-Linux64.run
 
 # get OST and tutorials
 RUN cd $HOME && \
