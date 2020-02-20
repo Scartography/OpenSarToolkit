@@ -76,9 +76,7 @@ RUN cd $HOME && \
     pip install -r requirements_test.txt && \
     python setup.py install && \
     cd $HOME && \
-    git clone https://github.com/Scartography/OST_Notebooks.git && \
-    cd $HOME/OST_Notebooks && \
-    git checkout SLC_processing
+    git clone https://github.com/Scartography/OST_Notebooks.git
 
 # Return Home
 RUN cd $HOME
