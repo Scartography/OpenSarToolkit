@@ -1,7 +1,9 @@
-language: python
+sudo: required
 services:
   - docker
 
-script:
+before_install:
   - docker pull scartography/opensartoolkit:latest
+
+script:
   - docker run scartography/opensartoolkit:latest /bin/sh -c "export TRAVIS=$TRAVIS; cd OpenSarToolkit; pip uninstall -y ost; git fetch; git checkout $TRAVIS_BRANCH; git pull; python setup.py install; pytest -v --cov ost tests/;"
