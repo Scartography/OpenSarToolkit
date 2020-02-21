@@ -66,6 +66,9 @@ def test_s1_scenes(s1_slc_master,
             assert dif == control_dif
 
 
+@pytest.mark.skipif("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
+                    reason="Skipping this test on Travis CI."
+                    )
 def test_create_stack(s1_grd_notnr, some_bounds_slc):
     filelist = [s1_grd_notnr, s1_grd_notnr]
     with TemporaryDirectory(dir=os.getcwd()) as temp:
