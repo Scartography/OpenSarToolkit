@@ -98,13 +98,14 @@ class Sentinel1Scenes:
             raise RuntimeError('Need to specify or setup ard_type')
         if self.master.ard_parameters['type'] is None:
             raise RuntimeError('Need to specify or setup ard_type')
-        # more custom ARD params, see whats in s1scene.py and complement corespondingly
+        # more custom ARD params, see whats in s1scene.py
+        # and complement corespondingly
         out_files = []
         # process the master to ARD first
         with TemporaryDirectory() as temp:
             infile = self.master.get_path(download_dir=processing_dir)
             out_file = self.master.create_ard(
-                infile=infile,
+                filelist=infile,
                 out_dir=processing_dir,
                 out_prefix=self.master.scene_id,
                 temp_dir=temp,
@@ -118,7 +119,7 @@ class Sentinel1Scenes:
                 s.ard_parameters = self.master.ard_parameters
                 infile = s.get_path(download_dir=processing_dir)
                 out_file = s.create_ard(
-                    infile=infile,
+                    filelist=infile,
                     out_dir=processing_dir,
                     out_prefix=s.scene_id,
                     temp_dir=temp,

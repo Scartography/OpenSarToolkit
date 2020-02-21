@@ -7,11 +7,11 @@ services:
   - docker
 
 before_install:
-  - docker build -t scartography/opensartoolkit:travis --build-arg TRAVIS=true .
-  - docker run scartography/opensartoolkit:travis /bin/sh -c "cd OpenSarToolkit; pytest -v --cov=ost tests/;"
+  - docker pull scartography/opensartoolkit:latest
+  - docker run scartography/opensartoolkit:latest /bin/sh -c "cd OpenSarToolkit; pip uninstall -y ost; git fetch; git checkout $TRAVIS_BRANCH; git pull; python setup.py install; pytest -v --cov ost tests/;"
 
 script:
-  - pytest -v --cov=ost tests/
+  - pytest -v --cov ost tests/
 
 after_success:
   - coveralls
