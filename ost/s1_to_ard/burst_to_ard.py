@@ -48,7 +48,8 @@ def _import(infile, out_prefix, logfile, swath, burst, polar='VV,VH,HH,HV'):
     command = '{} {} -x -q {} -Pinput={} -Ppolar={} -Pswath={}\
                       -Pburst={} -Poutput={}'\
         .format(gpt_file, graph, 2, infile, polar, swath,
-                burst, out_prefix)
+                burst, out_prefix
+                )
     return_code = h.run_command(command, logfile)
 
     if return_code == 0:
@@ -57,7 +58,7 @@ def _import(infile, out_prefix, logfile, swath, burst, polar='VV,VH,HH,HV'):
         raise GPTRuntimeError('ERROR: Frame import exited with an error. \
                 See {} for Snap Error output'.format(logfile))
 
-    return out_prefix
+    return return_code
 
 
 def _ha_alpha(infile, outfile, logfile, pol_speckle_filter=False):

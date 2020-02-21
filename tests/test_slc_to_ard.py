@@ -51,8 +51,10 @@ def test_ost_slc_to_ard(
             )
         except Exception as e:
             raise e
+        assert len(out_files) == 1
         for f in out_files:
             assert os.path.isfile(f)
+
         product.create_rgb(
             outfile=os.path.join(processing_dir, scene_id+'_'+ard_type+'.tif')
         )
