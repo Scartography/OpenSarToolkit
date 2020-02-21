@@ -1,6 +1,6 @@
 # Open SAR Toolkit (OST)
 
-[![Build Status](https://travis-ci.org/Scartography/OpenSarToolkit.svg?branch=ost_tests)](https://travis-ci.org/Scartography/OpenSarToolkit)
+[![Build Status](https://travis-ci.org/Scartography/OpenSarToolkit.svg?branch=master)](https://travis-ci.org/Scartography/OpenSarToolkit)
 
 ## Objective
 
