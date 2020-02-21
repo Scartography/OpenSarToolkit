@@ -8,7 +8,7 @@ services:
 
 before_install:
   - docker pull scartography/opensartoolkit:latest
-  - docker run scartography/opensartoolkit:latest /bin/sh -c "cd OpenSarToolkit; python setup.py test;"
+  - docker run scartography/opensartoolkit:latest /bin/sh -c "cd OpenSarToolkit; pytest -v --cov=ost tests/;"
 
 script:
-  - python setup.py test
+  - pytest -v --cov=ost tests/
