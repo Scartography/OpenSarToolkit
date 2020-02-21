@@ -2,6 +2,6 @@ language: python
 services:
   - docker
 
-before_install:
+script:
   - docker pull scartography/opensartoolkit:latest
   - docker run scartography/opensartoolkit:latest /bin/sh -c "export TRAVIS=$TRAVIS; cd OpenSarToolkit; pip uninstall -y ost; git fetch; git checkout $TRAVIS_BRANCH; git pull; python setup.py install; pytest -v --cov ost tests/;"
