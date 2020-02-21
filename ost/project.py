@@ -395,6 +395,7 @@ class Sentinel1Batch(Sentinel1):
 
         self.burst_inventory = None
         self.refined_inventory_dict = None
+        self.imported_scenes = {}
 
         self.ard_type = ard_type
         self.ard_parameters = {}
@@ -581,6 +582,10 @@ class Sentinel1Batch(Sentinel1):
                                     )
         if self.burst_inventory is None:
             return 'empty'
+
+        self.import_dir = opj(self.processing_dir, 'imports')
+        os.makedirs(self.import_dir, exist_ok=True)
+
         from ost.s1_to_ard.burst_to_ard import _import
         for index, burst in self.burst_inventory.iterrows():
             in_path = S1Scene(burst.SceneID).get_path(
@@ -588,15 +593,28 @@ class Sentinel1Batch(Sentinel1):
             )
             if in_path is None:
                 raise SceneNotDownloadedException
+            import_path = opj(
+                self.import_dir, '{}_{}_import'.format(
+                    burst.SceneID, burst.BurstID
+                )
+            )
+            import_log = opj(self.import_dir,
+                             '{}_import.err_log'.format(burst.BurstID)
+                             )
             # import bursts into project folder
-            # imported_burst = _import(
-            #     infile,
-            #     out_prefix,
-            #     logfile,
-            #     swath,
-            #     burst,
-            #     polar='VV,VH,HH,HV'
-            # )
+            out_prefix = _import(
+                infile=in_path,
+                out_prefix=import_path,
+                logfile=import_log,
+                swath=burst.Swath,
+                burst=burst.BurstID,
+                polar='VV,VH,HH,HV'
+            )
+            out_dim = opj(out_prefix, '.dim')
+            if not self.imported_scenes[burst.SceneID]:
+                self.imported_scenes[burst.SceneID] = [out_dim]
+            else:
+                self.imported_scenes[burst.SceneID].append(out_dim)
 
     def create_timeseries_animations(self,
                                      shrink_factor=5,

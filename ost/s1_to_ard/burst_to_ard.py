@@ -57,7 +57,7 @@ def _import(infile, out_prefix, logfile, swath, burst, polar='VV,VH,HH,HV'):
         raise GPTRuntimeError('ERROR: Frame import exited with an error. \
                 See {} for Snap Error output'.format(logfile))
 
-    return return_code
+    return out_prefix
 
 
 def _ha_alpha(infile, outfile, logfile, pol_speckle_filter=False):

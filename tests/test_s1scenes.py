@@ -1,4 +1,5 @@
 import os
+import pytest
 from datetime import timedelta
 from tempfile import TemporaryDirectory
 
@@ -80,6 +81,9 @@ def test_create_stack(s1_grd_notnr, some_bounds_slc):
         out_stack = s1_scenes.create_grd_stack()
 
 
+@pytest.mark.skipif("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
+                    reason="Skipping this test on Travis CI."
+                    )
 def test_coherence_s1_scenes(s1_slc_master, s1_slc_slave, some_bounds_slc):
     filelist = [s1_slc_master, s1_slc_slave]
 
