@@ -46,7 +46,9 @@ def test_sentinel_generic_class(some_bounds):
         del sen1
 
 
-@pytest.mark.skip(reason="Test too long for travis CI")
+@pytest.mark.skipif("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
+                    reason="Skipping this test on Travis CI."
+                    )
 def test_sentinel1_slc_batch(some_bounds):
     with TemporaryDirectory(dir=os.getcwd()) as temp, \
             TemporaryDirectory(dir=os.getcwd()) as dl_temp, \
@@ -93,7 +95,9 @@ def test_sentinel1_slc_batch(some_bounds):
         )
 
 
-@pytest.mark.skip(reason="Test too long for travis CI")
+@pytest.mark.skipif("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
+                    reason="Skipping this test on Travis CI."
+                    )
 def test_sentinel1_grd_batch(some_bounds):
     with TemporaryDirectory(dir=os.getcwd()) as temp, \
             TemporaryDirectory(dir=os.getcwd()) as dl_temp, \

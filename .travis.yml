@@ -5,6 +5,8 @@ python:
   - '3.6'
 services:
   - docker
+env:
+  TRAVIS=true
 
 before_install:
   - docker pull scartography/opensartoolkit:latest
