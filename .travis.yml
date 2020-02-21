@@ -1,17 +1,12 @@
-dist: bionic
 sudo: required
-language: python
-python:
-  - '3.6'
 services:
   - docker
 
 before_install:
   - docker pull scartography/opensartoolkit:latest
-  - docker run scartography/opensartoolkit:latest /bin/sh -c "export TRAVIS=$TRAVIS; cd OpenSarToolkit; pip uninstall -y ost; git fetch; git checkout $TRAVIS_BRANCH; git pull; python setup.py install; pytest -v --cov ost tests/;"
 
 script:
-  - pytest -v --cov ost tests/
+  - docker run scartography/opensartoolkit:latest /bin/sh -c "export TRAVIS=$TRAVIS; cd OpenSarToolkit; pip uninstall -y ost; git fetch; git checkout $TRAVIS_BRANCH; git pull; python setup.py install; pytest -v --cov ost tests/;"
 
 after_success:
   - coveralls
