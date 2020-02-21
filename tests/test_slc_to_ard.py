@@ -10,7 +10,9 @@ from ost.s1_to_ard.burst_to_ard import burst_to_ard
 from ost.errors import GPTRuntimeError
 from ost.helpers.utils import _product_zip_to_processing_dir
 
-
+@pytest.mark.skipif("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
+                    reason="Skipping this test on Travis CI."
+                    )
 def test_ost_slc_to_ard(
         ard_types,
         s1_slc_master,
@@ -63,7 +65,9 @@ def test_ost_slc_to_ard(
             raster_sum = np.nansum(out_tif.read(1))
         assert raster_sum != 0
 
-
+@pytest.mark.skipif("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
+                    reason="Skipping this test on Travis CI."
+                    )
 def test_ost_flat_slc_to_ard(
         ard_types,
         s1_slc_master,
@@ -114,7 +118,9 @@ def test_ost_flat_slc_to_ard(
             raster_sum = np.nansum(out_tif.read(1))
         assert raster_sum != 0
 
-
+@pytest.mark.skipif("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
+                    reason="Skipping this test on Travis CI."
+                    )
 def test_ceos_slc_to_ard(
         ard_types,
         s1_slc_master,
@@ -165,7 +171,9 @@ def test_ceos_slc_to_ard(
             raster_sum = np.nansum(out_tif.read(1))
         assert raster_sum != 0
 
-
+@pytest.mark.skipif("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
+                    reason="Skipping this test on Travis CI."
+                    )
 def test_earth_engine_slc_to_ard(
         ard_types,
         s1_slc_master,
@@ -216,7 +224,9 @@ def test_earth_engine_slc_to_ard(
             raster_sum = np.nansum(out_tif.read(1))
         assert raster_sum != 0
 
-
+@pytest.mark.skipif("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
+                    reason="Skipping this test on Travis CI."
+                    )
 def test_zhuo_slc_to_ard(
         ard_types,
         s1_slc_master,
