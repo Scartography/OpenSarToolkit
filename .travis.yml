@@ -3,9 +3,11 @@ python:
   - '3.7'
 services:
   - docker
+env:
+  TRAVIS=true
 
 before_install:
-  - docker build --build-arg TRAVIS=true -t scartography/opensartoolkit:travis .
+  - docker build --build-arg TRAVIS=$TRAVIS -t scartography/opensartoolkit:travis .
   - docker run scartography/opensartoolkit:travis /bin/sh -c "cd OpenSarToolkit; pytest -v --cov=ost tests/;"
 
 script:
