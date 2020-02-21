@@ -78,19 +78,21 @@ def test_sentinel1_slc_batch(some_bounds):
             mosaic_refine=True,
             area_reduce=0.05
         )
+        sen1.ard_parameters['resolution'] = 50
+        sen1.inventory = sen1.inventory.tail(2)
+        sen1.download(mirror=sen1.mirror,
+                      concurrent=sen1.metadata_concurency,
+                      uname=HERBERT_USER['uname'],
+                      pword=HERBERT_USER['asf_pword']
+                      )
         sen1.create_burst_inventory(key='ASCENDING_VVVH', refine=True)
-        if "TRAVIS" in os.environ and os.environ["TRAVIS"] is False:
-            sen1.download(mirror=sen1.mirror,
-                          concurrent=sen1.metadata_concurency,
-                          uname=HERBERT_USER['uname'],
-                          pword=HERBERT_USER['asf_pword']
-                          )
-            sen1.to_ard(
-                subset=box(
-                    some_bounds[0], some_bounds[1], some_bounds[2], some_bounds[3]
-                ).wkt,
-                overwrite=True
-            )
+        sen1.burst_inventory = sen1.burst_inventory.tail(2)
+        sen1.to_ard(
+            subset=box(
+                some_bounds[0], some_bounds[1], some_bounds[2], some_bounds[3]
+            ).wkt,
+            overwrite=True
+        )
 
 
 def test_sentinel1_grd_batch(some_bounds):
@@ -125,6 +127,8 @@ def test_sentinel1_grd_batch(some_bounds):
                       uname=HERBERT_USER['uname'],
                       pword=HERBERT_USER['asf_pword']
                       )
+        sen1.ard_parameters['resolution'] = 50
+        sen1.inventory = sen1.inventory.tail(1)
         sen1.to_ard(
             subset=box(
                 some_bounds[0], some_bounds[1], some_bounds[2], some_bounds[3]
