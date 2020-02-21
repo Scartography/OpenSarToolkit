@@ -15,13 +15,13 @@ def mosaic(
         outfile,
         cut_to_aoi=False
 ):
-
     check_file = opj(
-        os.path.dirname(outfile), '.{}.processed'.format(os.path.basename(outfile)[:-4])
+        os.path.dirname(outfile),
+        '.{}.processed'.format(os.path.basename(outfile)[:-4])
     )
-
     logfile = opj(
-        os.path.dirname(outfile), '{}.errLog'.format(os.path.basename(outfile)[:-4])
+        os.path.dirname(outfile),
+        '{}.errLog'.format(os.path.basename(outfile)[:-4])
     )
 
     with rasterio.open(filelist.split(' ')[0]) as src:
@@ -41,14 +41,14 @@ def mosaic(
                ' -temp_dir {}'
                ' -il {}'
                ' -out {} {}'.format(temp_dir, filelist,
-                                    tempfile, dtype)
+                                    tempfile, dtype
+                                    )
                )
 
         return_code = h.run_command(cmd, logfile)
         if return_code != 0:
             if os.path.isfile(tempfile):
                 os.remove(tempfile)
-
             return
 
     if cut_to_aoi:
@@ -57,21 +57,27 @@ def mosaic(
 
         # import raster and mask
         with rasterio.open(tempfile) as src:
-            out_image, out_transform = rasterio.mask.mask(src, features, crop=True)
+            out_image, out_transform = rasterio.mask.mask(
+                src,
+                features, crop=True
+            )
             out_meta = src.meta.copy()
             ndv = src.nodata
             out_image = np.ma.masked_where(out_image == ndv, out_image)
 
-        out_meta.update({'driver': 'GTiff', 'height': out_image.shape[1],
-                         'width': out_image.shape[2], 'transform': out_transform,
-                         'tiled': True, 'blockxsize': 128, 'blockysize': 128})
+        out_meta.update({'driver': 'GTiff',
+                         'height': out_image.shape[1],
+                         'width': out_image.shape[2],
+                         'transform': out_transform,
+                         'tiled': True,
+                         'blockxsize': 128,
+                         'blockysize': 128
+                         })
 
         with rasterio.open(outfile, 'w', **out_meta) as dest:
             dest.write(out_image.data)
-
         # remove intermediate file
         os.remove(tempfile)
-
     # check
     return_code = h.check_out_tiff(outfile)
     if return_code != 0:

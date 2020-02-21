@@ -205,7 +205,6 @@ def timeseries_to_timescan(
 def mosaic_timeseries(
         inventory_df,
         processing_dir,
-        temp_dir,
         cut_to_aoi=False,
         exec_file=None
 ):

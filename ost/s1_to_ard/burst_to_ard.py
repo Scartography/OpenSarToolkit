@@ -2,13 +2,13 @@
 import os
 from os.path import join as opj
 import logging
-import sys
 import rasterio
 import warnings
 
 from rasterio.errors import NotGeoreferencedWarning
 
 from ost.helpers import utils as h
+from ost.errors import GPTRuntimeError
 from ost.settings import SNAP_S1_RESAMPLING_METHODS, OST_ROOT
 
 logger = logging.getLogger(__name__)
@@ -54,9 +54,8 @@ def _import(infile, out_prefix, logfile, swath, burst, polar='VV,VH,HH,HV'):
     if return_code == 0:
         logger.debug('INFO: Succesfully imported product')
     else:
-        logger.debug('ERROR: Frame import exited with an error. \
+        raise GPTRuntimeError('ERROR: Frame import exited with an error. \
                 See {} for Snap Error output'.format(logfile))
-        # sys.exit(119)
 
     return return_code
 
@@ -102,9 +101,8 @@ def _ha_alpha(infile, outfile, logfile, pol_speckle_filter=False):
     if return_code == 0:
         logger.debug('INFO: Succesfully created H/Alpha product')
     else:
-        logger.debug('ERROR: H/Alpha exited with an error. \
+        raise GPTRuntimeError('ERROR: H/Alpha exited with an error. \
                 See {} for Snap Error output'.format(logfile))
-        # sys.exit(121)
 
     return return_code
 
@@ -172,8 +170,7 @@ def _calibration(infile,
         command = '{} {} -x -q {} -Pregion="{}" -Pinput={} -Poutput={}' \
             .format(gpt_file, graph, 2, region, infile, outfile)
     else:
-        logger.debug('ERROR: Wrong product type selected.')
-        sys.exit(121)
+        raise GPTRuntimeError('ERROR: Wrong product type selected.')
 
     logger.debug("INFO: Removing thermal noise, calibrating and debursting")
     return_code = h.run_command(command, logfile)
@@ -181,9 +178,8 @@ def _calibration(infile,
     if return_code == 0:
         logger.debug('INFO: Succesfully calibrated product')
     else:
-        logger.debug('ERROR: Frame import exited with an error. \
+        raise GPTRuntimeError('ERROR: Frame import exited with an error. \
                 See {} for Snap Error output'.format(logfile))
-        # sys.exit(121)
 
     return return_code
 
@@ -220,10 +216,10 @@ def _speckle_filter(infile, outfile, logfile):
     if return_code == 0:
         logger.debug('INFO: Succesfully imported product')
     else:
-        logger.debug('ERROR: Speckle Filtering exited with an error. \
-                See {} for Snap Error output'.format(logfile))
-        sys.exit(111)
-
+        raise GPTRuntimeError(
+            'ERROR: Speckle Filtering exited with an error. \
+                See {} for Snap Error output'.format(logfile)
+        )
     return return_code
 
 
@@ -257,9 +253,8 @@ def _linear_to_db(infile, outfile, logfile):
     if return_code == 0:
         logger.debug('INFO: Succesfully converted product to dB-scale.')
     else:
-        logger.debug('ERROR: Linear to dB conversion exited with an error. \
+        raise GPTRuntimeError('ERROR: Linear to dB conversion exited with an error. \
                 See {} for Snap Error output'.format(logfile))
-        # sys.exit(113)
     return return_code
 
 
@@ -285,7 +280,6 @@ def _ls_mask(infile, outfile, logfile, resolution, dem='SRTM 1sec HGT'):
                        'ACE30'
 
     '''
-
     # get gpt file
     gpt_file = h.gpt_path()
 
@@ -301,9 +295,10 @@ def _ls_mask(infile, outfile, logfile, resolution, dem='SRTM 1sec HGT'):
     if return_code == 0:
         logger.debug('INFO: Succesfully created Layover/Shadow mask')
     else:
-        logger.debug('ERROR: Layover/Shadow mask creation exited with an error. \
-                See {} for Snap Error output'.format(logfile))
-        # sys.exit(121)
+        raise GPTRuntimeError(
+            'ERROR: Layover/Shadow mask creation exited with an error. \
+                            See {} for Snap Error output'.format(logfile)
+        )
 
     return return_code
 
@@ -344,9 +339,8 @@ def _coreg(filelist, outfile, logfile, dem='SRTM 1sec HGT'):
     if return_code == 0:
         logger.debug('INFO: Succesfully coregistered product.')
     else:
-        logger.debug('ERROR: Co-registration exited with an error. \
+        raise GPTRuntimeError('ERROR: Co-registration exited with an error. \
                 See {} for Snap Error output'.format(logfile))
-        # sys.exit(112)
 
     return return_code
 
@@ -395,10 +389,9 @@ def _coreg2(master,
     if return_code == 0:
         logger.debug('INFO: Succesfully coregistered product.')
     else:
-        logger.debug('ERROR: Co-registration exited with an error. \
-                See {} for Snap Error output'.format(logfile))
-        # sys.exit(112)
-
+        raise GPTRuntimeError('ERROR: Co-registration exited with an error. \
+                See {} for Snap Error output'.format(logfile)
+                              )
     return return_code
 
 
@@ -431,9 +424,9 @@ def _coherence(infile, outfile, logfile):
     if return_code == 0:
         logger.debug('INFO: Succesfully created coherence product.')
     else:
-        logger.debug('ERROR: Coherence exited with an error. \
-                See {} for Snap Error output'.format(logfile))
-        # sys.exit(121)
+        raise GPTRuntimeError('ERROR: Coherence exited with an error. \
+                See {} for Snap Error output'.format(logfile)
+                              )
 
     return return_code
 
@@ -482,15 +475,18 @@ def _terrain_correction(infile, outfile, logfile, resolution,
     if return_code == 0:
         logger.debug('INFO: Succesfully orthorectified product.')
     else:
-        logger.debug('ERROR: Geocoding exited with an error. \
-                See {} for Snap Error output'.format(logfile))
-        # sys.exit(122)
-
+        raise GPTRuntimeError('ERROR: Geocoding exited with an error. \
+                See {} for Snap Error output'.format(logfile)
+                              )
     return return_code
 
 
-def _terrain_correction_deg(infile, outfile, logfile, resolution=0.001,
-                            dem='SRTM 1sec HGT'):
+def _terrain_correction_deg(infile,
+                            outfile,
+                            logfile,
+                            resolution=0.001,
+                            dem='SRTM 1sec HGT'
+                            ):
     '''A wrapper around SNAP's Terrain Correction routine
 
     This function takes an OST calibrated Sentinel-1 product and
@@ -532,10 +528,9 @@ def _terrain_correction_deg(infile, outfile, logfile, resolution=0.001,
     if return_code == 0:
         logger.debug('INFO: Succesfully orthorectified product.')
     else:
-        logger.debug('ERROR: Geocoding exited with an error. \
-                See {} for Snap Error output'.format(logfile))
-        # sys.exit(122)
-
+        raise GPTRuntimeError('ERROR: Geocoding exited with an error. \
+                See {} for Snap Error output'.format(logfile)
+                              )
     return return_code
 
 
@@ -584,9 +579,10 @@ def burst_to_ard(
     '''
     if len(master_file) != 1 and isinstance(master_file, list) \
             or master_file == '' or master_file is None:
-        raise RuntimeError('No or invalid file in swath %s burst %s, input: %s',
-                           swath, master_burst_id, master_file
-                           )
+        raise RuntimeError(
+            'No or invalid file in swath %s burst %s, input: %s',
+            swath, master_burst_id, master_file
+        )
     if isinstance(master_file, list):
         master_file = master_file[0]
 
@@ -885,10 +881,12 @@ def _2products_coherence_tc(
         return return_code
 
     # move to final destination
-    h.move_dimap(out_tc, opj(out_dir, '{}_{}_{}_coh'.format(master_scene.start_date,
-                                                            slave_scene.start_date,
-                                                            master_burst_id)
-                             )
+    h.move_dimap(out_tc,
+                 opj(out_dir, '{}_{}_{}_coh'.format(master_scene.start_date,
+                                                    slave_scene.start_date,
+                                                    master_burst_id
+                                                    )
+                     )
                  )
     # remove tmp files
     h.delete_dimap(out_coh)

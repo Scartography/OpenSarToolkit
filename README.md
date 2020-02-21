@@ -27,7 +27,7 @@ routines. The SAR processing itself relies on ESA's Sentinel-1 Toolbox as well
 as some geospatial python libraries and the Orfeo Toolbox for mosaicking.
 
 You can find examplarotary Jupyter notebooks at 
-https://github.com/ESA-PhiLab/OST_Notebooks for getting started. 
+https://github.com/Scartography/OST_Notebooks for getting started. 
 
 ## Installation
 
@@ -43,8 +43,8 @@ found at https://docs.docker.com/install/
 After docker is installed and running, launch the container with:
 
 ```
-docker pull buddyvolly/opensartoolkit
-docker run -it -p 8888:8888 -v /shared/folder/on/host:/home/ost/shared opensartoolkit
+docker pull scartography/opensartoolkit
+docker run -it -p 8888:8888
 ```
 
 The docker image automatically executes the jupyter lab and runs it on 
@@ -80,7 +80,7 @@ execution from command line.
 
 #### OST installation
 
-OST is developed under Ubuntu 18.04 OS in python 3.6. It has not been tested 
+OST is developed under Ubuntu 18.04 OS in python 3.7. It has not been tested 
 much on other OS and python versions, but should in principle work on any OS 
 and any python version >= 3.5.
 

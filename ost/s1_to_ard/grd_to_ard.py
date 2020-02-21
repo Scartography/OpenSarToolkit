@@ -56,11 +56,7 @@ python3 grd_to_ard.py -p /path/to/scene -r 20 -p RTC -l True -s False
     -o    defines the /path/to/the/output
 
 '''
-
-
-# import stdlib modules
 import os
-import sys
 import glob
 import shutil
 import time
@@ -68,8 +64,9 @@ import rasterio
 import numpy as np
 import gdal
 import logging
-
 from os.path import join as opj
+
+from ost.errors import GPTRuntimeError
 from ost.helpers import utils as h
 from ost.settings import OST_ROOT
 
@@ -96,9 +93,8 @@ def _grd_frame_import(
                  file written in BEAM-Dimap format
         logfile: string or os.path object for the file
                  where SNAP'S STDOUT/STDERR is written to
-        polarisation (str): a string consisiting of the polarisation (comma separated)
-                     e.g. 'VV,VH',
-                     default value: 'VV,VH,HH,HV'
+        polarisation (str): a string consisiting of the polarisation
+        (comma separated) e.g.: 'VV,VH' (default: 'VV,VH,HH,HV')
     '''
 
     logger.debug('INFO: Importing {} by applying precise orbit file and '
@@ -224,10 +220,8 @@ def _slice_assembly(filelist,
     if return_code == 0:
         logger.debug('INFO: Succesfully assembled products')
     else:
-        logger.debug('ERROR: Slice Assembly exited with an error. \
+        raise GPTRuntimeError('ERROR: Slice Assembly exited with an error. \
                 See {} for Snap Error output'.format(logfile))
-        sys.exit(101)
-
     return return_code
 
 
@@ -264,10 +258,8 @@ def _grd_subset(infile, outfile, logfile, region):
     if return_code == 0:
         logger.debug('INFO: Succesfully subsetted product')
     else:
-        logger.debug('ERROR: Subsetting exited with an error. \
+        raise GPTRuntimeError('ERROR: Subsetting exited with an error. \
                 See {} for Snap Error output'.format(logfile))
-        sys.exit(107)
-
     return return_code
 
 
@@ -304,10 +296,8 @@ def _grd_subset_georegion(infile, outfile, logfile, georegion):
     if return_code == 0:
         logger.debug('INFO: Succesfully subsetted product.')
     else:
-        logger.debug('ERROR: Subsetting exited with an error. \
+        raise GPTRuntimeError('ERROR: Subsetting exited with an error. \
                 See {} for Snap Error output'.format(logfile))
-        sys.exit(107)
-
     return return_code
 
 
@@ -476,8 +466,7 @@ def _grd_backscatter(
         )
         graph = opj(OST_ROOT, 'graphs', 'S1_GRD2ARD', '2_CalSigma.xml')
     else:
-        logger.debug('ERROR: Wrong product type selected.')
-        sys.exit(103)
+        raise GPTRuntimeError('ERROR: Wrong product type selected.')
 
     # construct command sring
     if product_type == 'RTC':
@@ -498,10 +487,9 @@ def _grd_backscatter(
     if return_code == 0:
         logger.debug('INFO: Succesfully calibrated product')
     else:
-        logger.debug('ERROR: Backscatter calibration exited with an error. \
+        raise GPTRuntimeError('ERROR: Backscatter calibration exited with an error. \
                 See {} for Snap Error output'.format(logfile)
                      )
-        sys.exit(103)
     return return_code
 
 
@@ -539,10 +527,8 @@ def _grd_speckle_filter(infile, outfile, logfile):
     if return_code == 0:
         logger.debug('INFO: Succesfully imported product')
     else:
-        logger.debug('ERROR: Speckle Filtering exited with an error. \
+        raise GPTRuntimeError('ERROR: Speckle Filtering exited with an error. \
                 See {} for Snap Error output'.format(logfile))
-        sys.exit(111)
-
     return return_code
 
 
@@ -576,10 +562,8 @@ def _grd_to_db(infile, outfile, logfile):
     if return_code == 0:
         logger.debug('INFO: Succesfully converted product to dB-scale.')
     else:
-        logger.debug('ERROR: Linear to dB conversion exited with an error. \
+        raise GPTRuntimeError('ERROR: Linear to dB conversion exited with an error. \
                 See {} for Snap Error output'.format(logfile))
-        sys.exit(113)
-
     return return_code
 
 
@@ -645,10 +629,8 @@ def _grd_terrain_correction(
     if return_code == 0:
         logger.debug('INFO: Succesfully imported product')
     else:
-        logger.debug('ERROR: Terain Correction exited with an error. \
+        raise GPTRuntimeError('ERROR: Terain Correction exited with an error. \
                 See {} for Snap Error output'.format(logfile))
-        sys.exit(112)
-
     return return_code
 
 
@@ -715,10 +697,8 @@ def _grd_terrain_correction_deg(
     if return_code == 0:
         logger.debug('INFO: Succesfully imported product')
     else:
-        logger.debug('ERROR: Terain Correction exited with an error. \
+        raise GPTRuntimeError('ERROR: Terain Correction exited with an error. \
                 See {} for Snap Error output'.format(logfile))
-        sys.exit(112)
-
     return return_code
 
 
@@ -781,9 +761,10 @@ def _grd_ls_mask(
     if return_code == 0:
         logger.debug('INFO: Succesfully create a Layover/Shadow mask')
     else:
-        logger.debug('ERROR: Layover/Shadow mask creation exited with an error. \
-                See {} for Snap Error output'.format(logfile))
-        raise RuntimeError
+        raise GPTRuntimeError(
+            'ERROR: Layover/Shadow mask creation exited with an error. \
+                            See {} for Snap Error output'.format(logfile)
+        )
     return return_code
 
 

@@ -272,7 +272,9 @@ def _get_regular_ts(
                            )[0]
         # create outfile
         outfile = opj(
-            out_dir, '{}.{}.{}.{}.tif'.format(i, out_date, product_suffix, polarization)
+            out_dir, '{}.{}.{}.{}.tif'.format(
+                i, out_date, product_suffix, polarization
+            )
         )
         logger.debug('Writing date %s to file %s', out_date, outfile)
 

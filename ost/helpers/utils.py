@@ -170,7 +170,6 @@ def run_command(command, logfile, elapsed=True, silent=False):
                 file.write('{}\n'.format(line))
     if elapsed:
         timer(currtime)
-
     return process.returncode
 
 

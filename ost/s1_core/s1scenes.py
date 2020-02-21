@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 class Sentinel1Scenes:
     def __init__(
             self,
+            aoi,
             filelist,
             processing_dir=None,
             ard_type='OST',
@@ -51,6 +52,11 @@ class Sentinel1Scenes:
                         product=S1scene(scene_id=scene_id),
                         product_path=s
                     )
+        self.aoi = aoi
+        self.filelist = [self.master.get_path(download_dir=self.processing_dir)]
+        for slave in self.slaves:
+            filelist.append(slave.get_path(download_dir=self.processing_dir))
+        self.processing_dir = processing_dir
 
         self.slaves = slave_list
         self.cleanup = cleanup
@@ -62,7 +68,12 @@ class Sentinel1Scenes:
         self.ard_type = ard_type
         if ard_type is not None:
             self.master.set_ard_parameters(ard_type)
-            self.master.ard_parameters['product_type'] = (ard_type)
+            self.ard_type = self.master.set_ard_parameters(ard_type)
+        else:
+            self.ard_type = self.master.set_ard_parameters(ard_type)
+
+        # Keep imported products alive somewhere
+        self.slc_import_dict = {}
 
     def create_grd_stack(self):
         if self.master.product_type == 'SLC':
@@ -70,11 +81,8 @@ class Sentinel1Scenes:
                 'For S1 TOPS SLC products, TOPS Coregistration should be used'
             )
         out_stack = opj(self.processing_dir, self.master.scene_id)
-        filelist = [self.master.get_path(download_dir=self.processing_dir)]
-        for slave in self.slaves:
-            filelist.append(slave.get_path(download_dir=self.processing_dir))
         create_grd_stack(
-            filelist=filelist,
+            filelist=self.filelist ,
             out_stack=out_stack,
             logfile=logger,
             polarisation='VV,VH,HH,HV',
@@ -83,12 +91,21 @@ class Sentinel1Scenes:
         self.out_stack = out_stack
         return out_stack
 
-    def import_slc(self,
-                   processing_dir,
-                   subset
-                   ):
-        slc_import_dict = {}
-        self.slc_import_dict = slc_import_dict
+    def import_slcs(self,
+                    processing_dir,
+                    subset=None
+                    ):
+        if subset is None:
+            subset = self.aoi
+        #raise NotImplementedError
+        for file in self.filelist:
+            if file.scene_id in self.self.slc_import_dict.keys:
+                continue
+
+            #self.slc_import_dict[self.master.scene_id] = slc_import_dict
+
+    def add_scene(self):
+        raise NotImplementedError
 
     def s1_scenes_to_ard(self,
                          processing_dir,
@@ -98,13 +115,14 @@ class Sentinel1Scenes:
             raise RuntimeError('Need to specify or setup ard_type')
         if self.master.ard_parameters['type'] is None:
             raise RuntimeError('Need to specify or setup ard_type')
-        # more custom ARD params, see whats in s1scene.py and complement corespondingly
+        # more custom ARD params, see whats in s1scene.py
+        # and complement corespondingly
         out_files = []
         # process the master to ARD first
         with TemporaryDirectory() as temp:
             infile = self.master.get_path(download_dir=processing_dir)
             out_file = self.master.create_ard(
-                infile=infile,
+                filelist=infile,
                 out_dir=processing_dir,
                 out_prefix=self.master.scene_id,
                 temp_dir=temp,
