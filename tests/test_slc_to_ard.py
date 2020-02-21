@@ -2,6 +2,7 @@ import os
 import numpy as np
 import rasterio
 import shutil
+import pytest
 from shapely.geometry import box
 from tempfile import TemporaryDirectory
 
@@ -265,6 +266,9 @@ def test_zhuo_slc_to_ard(
         assert raster_sum != 0
 
 
+@pytest.mark.skipif("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
+                    reason="Skipping this test on Travis CI."
+                    )
 def test_burst_to_ard(
         s1_slc_master,
         s1_slc_ost_master,
