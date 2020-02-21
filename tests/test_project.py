@@ -4,9 +4,12 @@ import pytest
 from os.path import join as opj
 from shapely.geometry import box
 from tempfile import TemporaryDirectory
-from ost.project import Sentinel1Batch as SenBatch
 
+from ost.project import Sentinel1Batch as SenBatch
 from ost.settings import HERBERT_USER
+
+from ost.errors import SceneNotDownloadedException
+
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +25,7 @@ def test_sentinel_generic_class(some_bounds):
                  project_dir=temp,
                  aoi=box(some_bounds[0], some_bounds[1], some_bounds[2], some_bounds[3]).wkt,
                  start='2020-01-01',
-                 end='2020-01-04',
+                 end='2020-01-06',
                  data_mount='/eodata',
                  download_dir=dl_temp,
                  mirror=2,
@@ -37,16 +40,15 @@ def test_sentinel_generic_class(some_bounds):
                         uname=HERBERT_USER['uname'],
                         pword=HERBERT_USER['pword']
                         )
-            sen1.refine(
-                exclude_marginal=True,
-                full_aoi_crossing=True,
-                mosaic_refine=True,
-                area_reduce=0.05
-            )
-            assert 2 == len(sen1.inventory)
+            sen1.refine()
             sen1.plot_inventory(show=False)
             if sen1.product_type == 'SLC':
-                sen1.import_scenes()
+                assert 5 == len(sen1.inventory)
+                with pytest.raises(SceneNotDownloadedException) as exc_info:
+                    sen1.import_scenes()
+                    assert SceneNotDownloadedException == type(exc_info)
+            else:
+                assert 4 == len(sen1.inventory)
 
 
 @pytest.mark.skip(reason="Not testing this now")
@@ -126,14 +128,13 @@ def test_sentinel1_grd_batch(some_bounds):
                     uname=HERBERT_USER['uname'],
                     pword=HERBERT_USER['pword']
                     )
-
+        sen1.inventory = sen1.inventory.tail(1)
         sen1.download(mirror=sen1.mirror,
                       concurrent=sen1.metadata_concurency,
                       uname=HERBERT_USER['uname'],
                       pword=HERBERT_USER['asf_pword']
                       )
         sen1.ard_parameters['resolution'] = 50
-        sen1.inventory = sen1.inventory.tail(1)
         sen1.to_ard(
             subset=box(
                 some_bounds[0], some_bounds[1], some_bounds[2], some_bounds[3]
@@ -151,7 +152,7 @@ def test_sentinel_generic_download(some_bounds):
             TemporaryDirectory() as dl_temp, \
             TemporaryDirectory() as inv_temp:
 
-        sen1 = Sen1(
+        sen1 = SenBatch(
             project_dir=temp,
             aoi=box(some_bounds[0], some_bounds[1], some_bounds[2], some_bounds[3]).wkt,
             start='2020-01-01',

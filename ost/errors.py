@@ -19,3 +19,7 @@ class EmptyInventoryException(ValueError):
 
 class EmptySearchError(ValueError):
     """Raised when a Search returns empty when it probably shouldn't."""
+
+
+class SceneNotDownloadedException(ValueError):
+    """Raised when a Scene should have been downloaded beforehand."""

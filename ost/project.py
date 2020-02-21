@@ -12,11 +12,12 @@ from ost.helpers.bursts import burst_inventory, refine_burst_inventory
 from ost.s1_core import search, refine, s1_dl, batch
 from ost.s1_core.batch import _to_ard_batch
 from ost.s1_core.batch_burst import burst_to_ard_batch
+from ost.s1_core.s1scene import Sentinel1Scene as S1Scene
 from ost.helpers import scihub, utils as h, vector as vec
 from ost.multitemporal.utils import create_timeseries_animation
 from ost.settings import SNAP_S1_RESAMPLING_METHODS, ARD_TIMESCAN_METRICS
 
-from ost.errors import EmptyInventoryException
+from ost.errors import EmptyInventoryException, SceneNotDownloadedException
 
 logger = logging.getLogger(__name__)
 
@@ -392,6 +393,9 @@ class Sentinel1Batch(Sentinel1):
                          )
         self.max_workers = max_workers
 
+        self.burst_inventory = None
+        self.refined_inventory_dict = None
+
         self.ard_type = ard_type
         self.ard_parameters = {}
         self.set_ard_parameters(ard_type)
@@ -527,10 +531,13 @@ class Sentinel1Batch(Sentinel1):
             uname = self.uname
         if self.pword is not None:
             pword = self.pword
+        if self.refined_inventory_dict is None:
+            return 'empty'
 
         if key:
             outfile = opj(self.inventory_dir,
-                          'bursts.{}.shp').format(key)
+                          'bursts.{}.shp'
+                          ).format(key)
             self.burst_inventory = burst_inventory(
                 self.refined_inventory_dict[key],
                 outfile,
@@ -560,24 +567,27 @@ class Sentinel1Batch(Sentinel1):
 
     def import_scenes(self,
                       subset=None,
-                      direction=['ASCENDING_VVVH', 'DESCENDING_VVVH']
+                      direction=None,
                       ):
         if subset is None:
             subset = self.aoi
         if isinstance(direction, str):
             direction = [direction]
 
-        for key in direction:
-            # Create burst inventory for each key separately
-            self.create_burst_inventory(key=key,
-                                        refine=True,
-                                        uname=self.uname,
-                                        pword=self.pword
-                                        )
-            from ost.s1_to_ard.burst_to_ard import _import
-            for file in self.burst_inventory.iterrows():
-                print(file)
-
+        # Create burst inventory for each key separately
+        self.create_burst_inventory(refine=True,
+                                    uname=self.uname,
+                                    pword=self.pword
+                                    )
+        if self.burst_inventory is None:
+            return 'empty'
+        from ost.s1_to_ard.burst_to_ard import _import
+        for index, burst in self.burst_inventory.iterrows():
+            in_path = S1Scene(burst.SceneID).get_path(
+                self.download_dir, self.data_mount
+            )
+            if in_path is None:
+                raise SceneNotDownloadedException
             # import bursts into project folder
             # imported_burst = _import(
             #     infile,

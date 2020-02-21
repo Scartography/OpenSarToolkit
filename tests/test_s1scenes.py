@@ -11,11 +11,16 @@ from ost.s1_core.s1scene import Sentinel1Scene as S1Scene
 def test_s1_scenes(s1_slc_master,
                    s1_slc_slave,
                    s1_slc_ost_master,
-                   s1_slc_ost_slave
+                   s1_slc_ost_slave,
+                   some_bounds_slc
                    ):
     filelist = [s1_slc_master, s1_slc_slave]
     with TemporaryDirectory(dir=os.getcwd()) as temp:
-        s1_scenes = S1Scenes(filelist,
+        s1_scenes = S1Scenes(filelist=filelist,
+                             aoi=box(
+                                 some_bounds_slc[0], some_bounds_slc[1],
+                                 some_bounds_slc[2], some_bounds_slc[3]
+                             ).wkt,
                              processing_dir=temp,
                              ard_type=None,
                              cleanup=False
@@ -36,7 +41,11 @@ def test_s1_scenes(s1_slc_master,
 
         product_list = [s1_slc_ost_master[1], s1_slc_ost_slave[1]]
         with TemporaryDirectory(dir=os.getcwd()) as temp:
-            s1_scenes = S1Scenes(product_list,
+            s1_scenes = S1Scenes(filelist=product_list,
+                                 aoi=box(
+                                     some_bounds_slc[0], some_bounds_slc[1],
+                                     some_bounds_slc[2], some_bounds_slc[3]
+                                 ).wkt,
                                  processing_dir=temp,
                                  ard_type=None,
                                  cleanup=False
@@ -56,10 +65,14 @@ def test_s1_scenes(s1_slc_master,
             assert dif == control_dif
 
 
-def test_create_stack(s1_grd_notnr):
+def test_create_stack(s1_grd_notnr, some_bounds_slc):
     filelist = [s1_grd_notnr, s1_grd_notnr]
     with TemporaryDirectory(dir=os.getcwd()) as temp:
-        s1_scenes = S1Scenes(filelist,
+        s1_scenes = S1Scenes(filelist=filelist,
+                             aoi=box(
+                                 some_bounds_slc[0], some_bounds_slc[1],
+                                 some_bounds_slc[2], some_bounds_slc[3]
+                             ).wkt,
                              processing_dir=temp,
                              ard_type=None,
                              cleanup=False
@@ -72,7 +85,11 @@ def test_coherence_s1_scenes(s1_slc_master, s1_slc_slave, some_bounds_slc):
 
     with TemporaryDirectory(dir=os.getcwd()) as temp, \
             TemporaryDirectory(dir=os.getcwd()) as temp_2:
-        s1_scenes = S1Scenes(filelist,
+        s1_scenes = S1Scenes(filelist=filelist,
+                             aoi=box(
+                                 some_bounds_slc[0], some_bounds_slc[1],
+                                 some_bounds_slc[2], some_bounds_slc[3]
+                             ).wkt,
                              processing_dir=temp,
                              ard_type=None,
                              cleanup=False

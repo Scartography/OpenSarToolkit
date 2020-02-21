@@ -24,7 +24,12 @@ class Sentinel1Scenes:
             ard_type='OST',
             cleanup=False
     ):
-        slave_list = []
+        self.slaves = []
+        if processing_dir is None:
+            self.processing_dir = TemporaryDirectory()
+        else:
+            self.processing_dir = processing_dir
+
         for idx, s in zip(range(len(filelist)), filelist):
             if isinstance(s, S1scene):
                 scene_id = s.scene_id
@@ -37,32 +42,28 @@ class Sentinel1Scenes:
                     self.master = S1scene(scene_id=scene_id)
                     # Copy files to processing dir
                     _product_zip_to_processing_dir(
-                        processing_dir=processing_dir,
+                        processing_dir=self.processing_dir,
                         product=self.master,
                         product_path=s
                     )
             else:
                 if isinstance(s, S1scene):
-                    slave_list.append(s)
+                    self.slaves.append(s)
                 else:
-                    slave_list.append(S1scene(scene_id=scene_id))
+                    self.slaves.append(S1scene(scene_id=scene_id))
                     # Copy files to processing dir
                     _product_zip_to_processing_dir(
-                        processing_dir=processing_dir,
+                        processing_dir=self.processing_dir,
                         product=S1scene(scene_id=scene_id),
                         product_path=s
                     )
+
         self.aoi = aoi
         self.filelist = [self.master.get_path(download_dir=self.processing_dir)]
         for slave in self.slaves:
-            filelist.append(slave.get_path(download_dir=self.processing_dir))
-        self.processing_dir = processing_dir
+            self.filelist.append(slave.get_path(download_dir=self.processing_dir))
 
-        self.slaves = slave_list
         self.cleanup = cleanup
-        if processing_dir is None:
-            processing_dir = TemporaryDirectory()
-        self.processing_dir = processing_dir
 
         # ARD type is controled by master, kinda makes sense doesn't it
         self.ard_type = ard_type
@@ -82,7 +83,7 @@ class Sentinel1Scenes:
             )
         out_stack = opj(self.processing_dir, self.master.scene_id)
         create_grd_stack(
-            filelist=self.filelist ,
+            filelist=self.filelist,
             out_stack=out_stack,
             logfile=logger,
             polarisation='VV,VH,HH,HV',
@@ -120,7 +121,7 @@ class Sentinel1Scenes:
                 s.ard_parameters = self.master.ard_parameters
                 infile = s.get_path(download_dir=processing_dir)
                 out_file = s.create_ard(
-                    infile=infile,
+                    filelist=infile,
                     out_dir=processing_dir,
                     out_prefix=s.scene_id,
                     temp_dir=temp,
