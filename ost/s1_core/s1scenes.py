@@ -91,21 +91,6 @@ class Sentinel1Scenes:
         self.out_stack = out_stack
         return out_stack
 
-    def import_slcs(self,
-                    subset=None
-                    ):
-        if subset is None:
-            subset = self.aoi
-        # raise NotImplementedError
-        for file in self.filelist:
-            if file.scene_id in self.slc_import_dict.keys:
-                continue
-
-            self.slc_import_dict[self.master.scene_id] = slc_import_dict
-
-    def add_scene(self):
-        raise NotImplementedError
-
     def s1_scenes_to_ard(self,
                          processing_dir,
                          subset=None,

@@ -272,7 +272,6 @@ class Sentinel1(Generic):
         # downloaded
         self.inventory = search.check_availability(
             geodataframe, self.download_dir, self.data_mount)
-        return self.inventory
 
     def download_size(self, inventory_df=None):
         if inventory_df:
@@ -359,7 +358,6 @@ class Sentinel1(Generic):
                         self.inventory = inventory_df[
                             inventory_df.identifier != id
                         ]
-        return self
 
     def plot_inventory(self, inventory_df=None, transperancy=0.05, show=False):
         if inventory_df is None:
@@ -559,7 +557,36 @@ class Sentinel1Batch(Sentinel1):
                 self.aoi, self.burst_inventory,
                 '{}.refined.shp'.format(outfile[:-4])
             )
-        return self
+
+    def import_scenes(self,
+                      subset=None,
+                      direction=['ASCENDING_VVVH', 'DESCENDING_VVVH']
+                      ):
+        if subset is None:
+            subset = self.aoi
+        if isinstance(direction, str):
+            direction = [direction]
+
+        for key in direction:
+            # Create burst inventory for each key separately
+            self.create_burst_inventory(key=key,
+                                        refine=True,
+                                        uname=self.uname,
+                                        pword=self.pword
+                                        )
+            from ost.s1_to_ard.burst_to_ard import _import
+            for file in self.burst_inventory.iterrows():
+                print(file)
+
+            # import bursts into project folder
+            # imported_burst = _import(
+            #     infile,
+            #     out_prefix,
+            #     logfile,
+            #     swath,
+            #     burst,
+            #     polar='VV,VH,HH,HV'
+            # )
 
     def create_timeseries_animations(self,
                                      shrink_factor=5,
