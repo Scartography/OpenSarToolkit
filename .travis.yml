@@ -5,12 +5,13 @@ python:
   - '3.6'
 services:
   - docker
-env:
-  TRAVIS=true
 
 before_install:
-  - docker pull scartography/opensartoolkit:latest
-  - docker run scartography/opensartoolkit:latest /bin/sh -c "cd OpenSarToolkit; pytest -v --cov=ost tests/;"
+  - docker build -t scartography/opensartoolkit:travis --build-arg TRAVIS=true .
+  - docker run scartography/opensartoolkit:travis /bin/sh -c "cd OpenSarToolkit; pytest -v --cov=ost tests/;"
 
 script:
   - pytest -v --cov=ost tests/
+
+after_success:
+  - coveralls
