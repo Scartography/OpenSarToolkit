@@ -1,12 +1,28 @@
+#! /usr/bin/env python
+"""
+This script allows for the search of Sentinel-1 data on scihub.
+
+Based on some search parameters the script will create a query on
+www.scihub.copernicus.eu and return the results either as shapefile,
+sqlite, or PostGreSQL database.
+"""
+
+# import modules
 import getpass
 import os
 import ogr
-import logging
 import psycopg2 as pg
 
 from ost.helpers.vector import get_proj4, reproject_geometry
 
-logger = logging.getLogger(__name__)
+# script infos
+__author__ = 'Andreas Vollrath'
+__copyright__ = 'phi-lab, European Space Agency'
+__license__ = 'GPL'
+__version__ = '1.0'
+__maintainer__ = 'Andreas Vollrath'
+__email__ = ''
+__status__ = 'Production'
 
 
 # see if the pg-file is there
@@ -28,7 +44,7 @@ def pgHandler(dbConnectFile = '{}/.phiSAR/pgdb'.format(os.getenv("HOME"))):
     try:
         f = open(dbConnectFile)
     except (FileNotFoundError, IOError):
-        logger.debug("ERROR: No PostGreSQL connection established. Make sure to configure a connection to phiSAR.")
+        print(" ERROR: No PostGreSQL connection established. Make sure to configure a connection to phiSAR.")
 
     # read out dbname, username
     lines = f.read().splitlines()
@@ -38,7 +54,7 @@ def pgHandler(dbConnectFile = '{}/.phiSAR/pgdb'.format(os.getenv("HOME"))):
     host = lines[3]
     port = lines[4]
 
-    logger.debug("INFO: Connecting to PostGreSQL database: {}".format(dbname))
+    print(" INFO: Connecting to PostGreSQL database: {}".format(dbname))
     dbConnect = pgConnect(uname, pwDb, dbname, host, port)
 
     return dbConnect
@@ -53,9 +69,9 @@ class pgConnect:
 
         # ask for username and password in case you have not defined as command line options
         if uname == None:
-            uname = input('Your PostGreSQL database username:')
+            uname = input(' Your PostGreSQL database username:')
         if pword == None:
-            pword = getpass.getpass('Your PostGreSQL database password:')
+            pword = getpass.getpass(' Your PostGreSQL database password:')
 
         # try connecting
         try:
@@ -64,7 +80,7 @@ class pgConnect:
             self.connection.autocommit = True
             self.cursor = self.connection.cursor()
         except:
-            logger.debug("Cannot connect to database")
+            print(" Cannot connect to database")
 
     def pgCreateS1(self, tablename):
 
@@ -145,7 +161,7 @@ class pgConnect:
 
     def pgDateline(self, tablename, uuid):
         """
-        This function splits the acquisition footlogger.debug
+        This function splits the acquisition footprint
         into a geometry collection if it crosses the dateline
         """
         # edited after https://www.mundialis.de/update-for-our-maps-mundialis-application-solves-dateline-wrap/
@@ -170,9 +186,9 @@ class pgConnect:
                         4326 \
                         ) geometry \
                     FROM {} \
-                    WHERE uuid = \'{}\'\
+                    WHERE uuid = \'{}\' \
                     ) \
-                    WHERE uuid  = \'{}\'\
+                    WHERE uuid  = \'{}\' \
                     AND ( \
                         ST_Intersects( \
                             geometry, \

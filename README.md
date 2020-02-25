@@ -1,7 +1,5 @@
 # Open SAR Toolkit (OST)
 
-[![Build Status](https://travis-ci.org/Scartography/OpenSarToolkit.svg?branch=ost_tests)](https://travis-ci.org/Scartography/OpenSarToolkit)
-
 ## Objective
 
 This python package lowers the entry barrier for accessing and pre-processing 
@@ -40,11 +38,12 @@ as the Open SAR Toolkit the tutorial notebooks.
 Docker installation is possible on various OS. Installation instructions can be 
 found at https://docs.docker.com/install/
 
-After docker is installed and running, launch the container with:
+After docker is installed and running, launch the container with 
+(adapt the path to the shared host folder):
 
 ```
 docker pull buddyvolly/opensartoolkit
-docker run -it -p 8888:8888 -v /shared/folder/on/host:/home/ost/shared opensartoolkit
+docker run -it -p 8888:8888 -v /shared/folder/on/host:/home/ost/shared buddyvolly/opensartoolkit
 ```
 
 The docker image automatically executes the jupyter lab and runs it on 
@@ -130,7 +129,7 @@ https://docs.conda.io/projects/conda/en/latest/user-guide/install/
 
 Then run the conda command to install OST's dependencies:
 ```
-conda install pip gdal jupyter jupyterlab git matplotlib numpy rasterio imageio geopandas fiona shapely matplotlib tqdm scipy
+conda install pip gdal jupyter jupyterlab git matplotlib numpy rasterio imageio rtree geopandas fiona shapely matplotlib descartes tqdm scipy
 ```
 
 Finally get the OST by using pip 
@@ -193,4 +192,3 @@ that are developed in parallel to this core package and should help to get start
 ## Author
 
 - Andreas Vollrath, ESA
-- Petr Sevcik, EOX

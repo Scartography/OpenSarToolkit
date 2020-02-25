@@ -1,81 +1,66 @@
-ARG BASE_CONTAINER=jupyter/scipy-notebook:7a3e968dd212
-FROM $BASE_CONTAINER
+FROM ubuntu:18.04
 
-USER root
+LABEL maintainer="Andreas Vollrath, ESA phi-lab"
+LABEL OpenSARToolkit='0.8'
 
-ENV HOME=/home/$NB_USER
+# set work directory to home and download snap
+WORKDIR /home/ost
+
+# copy the snap installation config file into the container
+COPY snap7.varfile $HOME
+
+# update variables
 ENV OTB_VERSION="7.0.0" \
     TBX_VERSION="7" \
     TBX_SUBVERSION="0"
-ENV TBX="esa-snap_sentinel_unix_${TBX_VERSION}_${TBX_SUBVERSION}.sh" \
+ENV \ 
+  TBX="esa-snap_sentinel_unix_${TBX_VERSION}_${TBX_SUBVERSION}.sh" \
   SNAP_URL="http://step.esa.int/downloads/${TBX_VERSION}.${TBX_SUBVERSION}/installers" \
   OTB=OTB-${OTB_VERSION}-Linux64.run \
-  HOME=$HOME \
-  PATH=$PATH:$HOME/programs/snap/bin:$HOME/programs/OTB-${OTB_VERSION}-Linux64/bin
-
-RUN sed -i -e 's:(groups):(groups 2>/dev/null):' /etc/bash.bashrc
-
-# install gdal as root
-RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -yq libgdal-dev \
-    python3-gdal \
-    libspatialindex-dev \
-    libgfortran3 && \
+  HOME=/home/ost \
+  PATH=$PATH:/home/ost/programs/snap/bin:/home/ost/programs/OTB-${OTB_VERSION}-Linux64/bin
+   
+# installall dependencies
+RUN groupadd -r ost && \
+    useradd -r -g ost ost && \
+    apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -yq \
+        python3 \
+        python3-pip \
+        git \
+        libgdal-dev \
+        python3-gdal \
+        libspatialindex-dev \
+        libgfortran3 \
+        wget \
+        nodejs \
+        unzip \
+        imagemagick \
+        npm \
+        cpulimit && \
     rm -rf /var/lib/apt/lists/*  && \
-    alias python=python3
-
-# Grant access to folders for user
-RUN fix-permissions $HOME && \
-    mkdir $HOME/programs && \
-    fix-permissions $HOME/programs
-
-# copy the snap installation config file into the container
-COPY snap7.varfile $HOME/programs/
-
-# Download and install SNAP and ORFEO Toolbox
-RUN cd  $HOME/programs && \
-    wget $SNAP_URL/$TBX && \
+    python3 -m pip install jupyterlab && \
+    mkdir /home/ost/programs && \
+    wget $SNAP_URL/$TBX && \    
     chmod +x $TBX && \
     ./$TBX -q -varfile snap7.varfile && \
     rm $TBX && \
     rm snap7.varfile && \
-    cd $HOME/programs && \
-    wget https://www.orfeo-toolbox.org/packages/${OTB} && \
+    cd /home/ost/programs && \
+    wget https://www.orfeo-toolbox.org/packages/${OTB} && \ 
     chmod +x $OTB && \
     ./${OTB} && \
-    rm -f OTB-${OTB_VERSION}-Linux64.run
+    rm -f OTB-${OTB_VERSION}-Linux64.run 
 
-USER $NB_UID
-
-RUN conda install  --quiet --yes \
-    oauthlib \
-    gdal \
-    fiona \
-    rasterio \
-    shapely \
-    xarray \
-    zarr \
-    psycopg2 \
-    geopandas \
-    cartopy \
-    tqdm \
-    lightgbm \
-    descartes && \
-    conda clean --all -f -y && \
-    fix-permissions $CONDA_DIR
-
-# jupyter geojson as regular user
-RUN jupyter labextension install @jupyterlab/geojson-extension
+#RUN /home/ost/snap/bin/snap --nosplash --nogui --modules --list --refresh
+#RUN /home/ost/snap/bin/snap --nosplash --nogui --modules --update-all
+# set usable memory to 12G
+RUN echo "-Xmx12G" > /home/ost/programs/snap/bin/gpt.vmoptions
 
 # get OST and tutorials
-RUN cd $HOME && \
-    git clone https://github.com/Scartography/OpenSarToolkit.git && \
-    cd $HOME/OpenSarToolkit && \
-    pip install setuptools && \
-    pip install -r requirements.txt && \
-    pip install -r requirements_test.txt && \
-    python setup.py install && \
-    cd $HOME && \
-    git clone https://github.com/Scartography/OST_Notebooks.git
+RUN python3 -m pip install git+https://github.com/jamesemwheeler/OSTParallel.git && \
+    git clone https://github.com/ESA-PhiLab/OST_Notebooks
 
-# Return Home
-RUN cd $HOME
+#ENV SHELL="/bin/bash/" 
+
+EXPOSE 8888
+CMD jupyter lab --ip='0.0.0.0' --port=8888 --no-browser --allow-root

@@ -15,10 +15,10 @@
     <parameters class="com.bc.ceres.binding.dom.XppDomElement">
       <sourceBands/>
       <demName>${dem}</demName>
-      <demResamplingMethod>BICUBIC_INTERPOLATION</demResamplingMethod>
-      <externalDEMFile/>
-      <externalDEMNoDataValue>0.0</externalDEMNoDataValue>
-      <externalDEMApplyEGM>true</externalDEMApplyEGM>
+      <demResamplingMethod>${dem_resampling}</demResamplingMethod>
+      <externalDEMFile>${dem_file}</externalDEMFile>
+      <externalDEMNoDataValue>${dem_nodata}</externalDEMNoDataValue>
+      <externalDEMApplyEGM>${egm_correction}</externalDEMApplyEGM>
       <saveLayoverShadowMask>true</saveLayoverShadowMask>
     </parameters>
   </node>
@@ -32,9 +32,9 @@
       <demName>${dem}</demName>
       <externalDEMFile>${dem_file}</externalDEMFile>
       <externalDEMNoDataValue>${dem_nodata}</externalDEMNoDataValue>
-      <externalDEMApplyEGM>true</externalDEMApplyEGM>
-      <demResamplingMethod>BILINEAR_INTERPOLATION</demResamplingMethod>
-      <imgResamplingMethod>${resampling}</imgResamplingMethod>
+      <externalDEMApplyEGM>${egm_correction}</externalDEMApplyEGM>
+      <demResamplingMethod>${dem_resampling}</demResamplingMethod>
+      <imgResamplingMethod>${image_resampling}</imgResamplingMethod>
       <pixelSpacingInMeter>${resol}</pixelSpacingInMeter>
       <pixelSpacingInDegree>0.0</pixelSpacingInDegree>
       <mapProjection>GEOGCS[&quot;WGS84(DD)&quot;,

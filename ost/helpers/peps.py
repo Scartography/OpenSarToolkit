@@ -1,17 +1,18 @@
+# -*- coding: utf-8 -*-
+
+# import standard libs
 import os
 import getpass
 import urllib
 import time
-import logging
+import multiprocessing
+
+# import non-standar libes
 import requests
 import tqdm
 
-from godale import Executor
-
-from ost.helpers import utils as h
-from ost import Sentinel1Scene as S1Scene
-
-logger = logging.getLogger(__name__)
+# import ost classes/functions
+from ost.helpers import helpers as h
 
 
 def ask_credentials():
@@ -23,7 +24,7 @@ def ask_credentials():
 
     '''
     # SciHub account details (will be asked by execution)
-    logger.debug('If you do not have a CNES Peps user account'
+    print(' If you do not have a CNES Peps user account'
           ' go to: https://peps.cnes.fr/ and register')
     uname = input(' Your CNES Peps Username:')
     pword = getpass.getpass(' Your CNES Peps Password:')
@@ -46,9 +47,8 @@ def connect(uname=None, pword=None):
     base_url = 'https://peps.cnes.fr/'
 
     if not uname:
-        logger.debug('If you do not have a CNES Peps user account'
-                     ' go to: https://peps.cnes.fr/ and register'
-                     )
+        print(' If you do not have a CNES Peps user account'
+              ' go to: https://peps.cnes.fr/ and register')
         uname = input(' Your CNES Peps Username:')
 
     if not pword:
@@ -113,13 +113,13 @@ def s1_download(argument_list):
 
         first_byte = os.path.getsize(filename)
         if first_byte == total_length:
-            logger.debug('INFO: {} already downloaded.'.format(filename))
+            print(' INFO: {} already downloaded.'.format(filename))
         else:
-            logger.debug('INFO: Continue downloading scene to: {}'.format(
+            print(' INFO: Continue downloading scene to: {}'.format(
                 filename))
 
     else:
-        logger.debug('INFO: Downloading scene to: {}'.format(filename))
+        print(' INFO: Downloading scene to: {}'.format(filename))
         first_byte = 0
 
     if first_byte >= total_length:
@@ -153,59 +153,29 @@ def s1_download(argument_list):
             first_byte = os.path.getsize(filename)
             
         # zipFile check
-        logger.debug(
-            'INFO: Checking the zip archive of {} for inconsistency'.format(
-            filename)
-        )
+        print(' INFO: Checking the zip archive of {} for inconsistency'.format(
+            filename))
         zip_test = h.check_zipfile(filename)
         # if it did not pass the test, remove the file
         # in the while loop it will be downlaoded again
         if zip_test is not None:
-            logger.debug('INFO: {} did not pass the zip test. \
+            print(' INFO: {} did not pass the zip test. \
                   Re-downloading the full scene.'.format(filename))
             os.remove(filename)
             first_byte = 0
         # otherwise we change the status to True
         else:
-            logger.debug('INFO: {} passed the zip test.'.format(filename))
+            print(' INFO: {} passed the zip test.'.format(filename))
             with open(str('{}.downloaded'.format(filename)), 'w') as file:
                 file.write('successfully downloaded \n')
 
 
-def peps_batch_download(
-        inventory_df,
-        download_dir,
-        uname,
-        pword,
-        concurrent=10
-):
-    missing_scenes = []
-    to_dl_list = _prepare_scenes_to_dl(inventory_df=inventory_df,
-                                       download_dir=download_dir,
-                                       uname=uname,
-                                       pword=pword
-                                       )
-    executor_type = 'concurrent_threads'
-    executor = Executor(executor=executor_type, max_workers=concurrent)
-    for task in executor.as_completed(
-            func=s1_download,
-            iterable=to_dl_list,
-            fargs=()
+def batch_download(inventory_df, download_dir, uname, pword, concurrent=10):
 
-    ):
-        task.result()
+    from ost import Sentinel1_Scene as S1Scene
+    print(' INFO: Getting the storage status (online/onTape) of each scene.')
+    print(' INFO: This may take a while.')
 
-    _check_downloaded_files(inventory_df,
-                            download_dir
-                            )
-    return missing_scenes
-
-
-def _prepare_scenes_to_dl(inventory_df, download_dir, uname, pword):
-    logger.debug(
-        'INFO: Getting the storage status (online/onTape) of each scene.'
-    )
-    logger.debug('INFO: This may take a while.')
     # this function does not just check,
     # but it already triggers the production of the S1 scene
     inventory_df['pepsStatus'], inventory_df['pepsUrl'] = (
@@ -214,8 +184,10 @@ def _prepare_scenes_to_dl(inventory_df, download_dir, uname, pword):
 
     # as long as there are any scenes left for downloading, loop
     while len(inventory_df[inventory_df['pepsStatus'] != 'downloaded']) > 0:
+
         # excluded downlaoded scenes
         inventory_df = inventory_df[inventory_df['pepsStatus'] != 'downloaded']
+
         # recheck for status
         inventory_df['pepsStatus'], inventory_df['pepsUrl'] = (
             zip(*[S1Scene(product).peps_online_status(uname, pword)
@@ -223,38 +195,43 @@ def _prepare_scenes_to_dl(inventory_df, download_dir, uname, pword):
 
         # if all scenes to download are on Tape, we wait for a minute
         if len(inventory_df[inventory_df['pepsStatus'] == 'online']) == 0:
-            logger.debug(
-                'INFO: Imagery still on tape, we will wait for 1 minute '
-                'and try again.'
-            )
+            print('INFO: Imagery still on tape, we will wait for 1 minute ' \
+                  'and try again.')
             time.sleep(60)
-    # create the peps_list for parallel download
-    download_list = []
-    for index, row in (
-            inventory_df[inventory_df['pepsStatus'] == 'online'].iterrows()):
 
-        # get scene identifier
-        scene_id = row.identifier
-        # construct download path
-        scene = S1Scene(scene_id)
-        download_path = scene._download_path(download_dir, True)
-        # put all info to the peps_list for parallelised download
-        download_list.append(
-            [inventory_df.pepsUrl[
-                 inventory_df.identifier == scene_id].tolist()[0],
-             download_path, uname, pword])
-    return download_list
+        # else we start downloading
+        else:
 
+            # create the peps_list for parallel download
+            peps_list = []
+            for index, row in (
+                    inventory_df[inventory_df['pepsStatus'] == 'online']
+                    .iterrows()):
 
-def _check_downloaded_files(inventory_df, download_dir):
-    # routine to check if the file has been downloaded
-    for index, row in (
-            inventory_df[inventory_df['pepsStatus'] == 'online'].iterrows()
-    ):
-        # get scene identifier
-        scene_id = row.identifier
-        # construct download path
-        scene = S1Scene(scene_id)
-        download_path = scene._download_path(download_dir)
-        if os.path.exists(download_path):
-            inventory_df.at[index, 'pepsStatus'] = 'downloaded'
+                # get scene identifier
+                scene_id = row.identifier
+                # construct download path
+                scene = S1Scene(scene_id)
+                download_path = scene._download_path(download_dir, True)
+                # put all info to the peps_list for parallelised download
+                peps_list.append(
+                    [inventory_df.pepsUrl[
+                        inventory_df.identifier == scene_id].tolist()[0],
+                        download_path, uname, pword])
+
+            # parallelised download
+            pool = multiprocessing.Pool(processes=concurrent)
+            pool.map(s1_download, peps_list)
+
+            # routine to check if the file has been downloaded
+            for index, row in (
+                    inventory_df[inventory_df['pepsStatus'] == 'online']
+                    .iterrows()):
+
+                # get scene identifier
+                scene_id = row.identifier
+                # construct download path
+                scene = S1Scene(scene_id)
+                download_path = scene._download_path(download_dir)
+                if os.path.exists(download_path):
+                    inventory_df.at[index, 'pepsStatus'] = 'downloaded'
